@@ -39,7 +39,7 @@ is installed or updated.
 
 ## Requirements
 
-- Debian 12/13 or Rocky Linux 8/9.
+- Debian 12 or Rocky Linux 8/9.
 - Root privileges for package installation, `/etc/opensips`, systemd, and `/etc/mnscloud`.
 - Network reachability from the OpenSIPS host to the MNSCloud API base URL.
 - A master `VoipSbcServer` record for this runtime, with engine `opensips` and a matching

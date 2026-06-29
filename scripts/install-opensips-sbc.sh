@@ -68,10 +68,10 @@ detect_opensips_os() {
   # shellcheck disable=SC1091
   . /etc/os-release
   case "${ID:-}:${VERSION_ID:-}" in
-    debian:12|debian:13) echo "debian"; return 0 ;;
+    debian:12) echo "debian"; return 0 ;;
     rocky:8*|rocky:9*) echo "rocky"; return 0 ;;
   esac
-  err "Unsupported operating system for OpenSIPS. Supported: Debian 12/13 and Rocky 8/9."
+  err "Unsupported operating system for OpenSIPS. Supported: Debian 12 and Rocky 8/9."
   exit 2
 }
 
