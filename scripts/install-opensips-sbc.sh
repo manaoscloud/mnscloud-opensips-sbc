@@ -11,6 +11,7 @@ API_TOKEN_FILE="/etc/mnscloud/sbc/api.token"
 API_BASE_FILE="/etc/mnscloud/sbc/api.base"
 MEDIA_SOCKET_FILE="/etc/mnscloud/sbc/media.socket"
 DEFAULT_API_BASE="${MNSCLOUD_API_BASE:-https://api.example.com}"
+SBC_ENGINE="${MNSCLOUD_SBC_ENGINE:-opensips}"
 NODE_UUID="${MNSCLOUD_SBC_NODE_UUID:-}"
 API_BASE=""
 API_TOKEN="${MNSCLOUD_SBC_API_TOKEN:-}"
@@ -209,16 +210,16 @@ bootstrap_node_via_api() {
   hostname_value="$(hostname -f 2>/dev/null || hostname 2>/dev/null || true)"
   private_ip="$(private_ipv4)"
   public_ip="$(public_ipv4)"
-  payload="{\"hostname\":\"$(json_escape "${hostname_value}")\""
+  payload="{\"engine\":\"$(json_escape "${SBC_ENGINE}")\",\"hostname\":\"$(json_escape "${hostname_value}")\""
   [[ -n "${private_ip}" ]] && payload+=",\"privateIP\":\"$(json_escape "${private_ip}")\""
   [[ -n "${public_ip}" ]] && payload+=",\"publicIP\":\"$(json_escape "${public_ip}")\""
   payload+="}"
   if [[ "$DRY_RUN" == true ]]; then
-    log DRY "POST ${API_BASE}/api/v1/sbc/opensips/bootstrap?node_uuid=${NODE_UUID} with local token ${API_TOKEN_FILE}"
+    log DRY "POST ${API_BASE}/api/v1/sbc/runtime/bootstrap?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE} with local token ${API_TOKEN_FILE}"
     return 0
   fi
   response_file="$(mktemp)"
-  http_code="$(curl -sS -o "${response_file}" -w "%{http_code}" -X POST "${API_BASE}/api/v1/sbc/opensips/bootstrap?node_uuid=${NODE_UUID}" -H "Content-Type: application/json" -H "Authorization: Bearer ${API_TOKEN}" --data "${payload}" 2>>"${LOG_FILE}")"
+  http_code="$(curl -sS -o "${response_file}" -w "%{http_code}" -X POST "${API_BASE}/api/v1/sbc/runtime/bootstrap?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}" -H "Content-Type: application/json" -H "Authorization: Bearer ${API_TOKEN}" -H "X-SBC-Engine: ${SBC_ENGINE}" --data "${payload}" 2>>"${LOG_FILE}")"
   server_uuid="$(json_field "serverUUID" "${response_file}")"
   if [[ "${http_code}" == "200" ]]; then
     media_socket="$(json_field "rtpengineSocket" "${response_file}")"
@@ -338,9 +339,10 @@ ${rtpengine_bye}
 
   if (is_method(\"INVITE\")) {
     xlog(\"L_INFO\", \"mnscloud SBC route lookup for \$rU from \$si\\n\");
-    \$var(route_payload) = \"{\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\"}\";
+    \$var(route_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\"}\";
     rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
-    \$var(rest_rc) = rest_post(\"${API_BASE}/api/v1/sbc/opensips/route?node_uuid=${NODE_UUID}\", \$var(route_payload), \"application/json\", \$var(body), \$var(ct), \$var(http_code));
+    rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+    \$var(rest_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/route?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(route_payload), \"application/json\", \$var(body), \$var(ct), \$var(http_code));
     if (\$var(rest_rc) < 0) { sl_send_reply(503, \"Route lookup failed\"); exit; }
     if (\$var(http_code) != 200) { sl_send_reply(503, \"Route lookup failed\"); exit; }
 ${rtpengine_offer}

@@ -23,11 +23,11 @@ Este diretório documenta o uso do OpenSIPS como SBC do mnscloud.
 
 ## Endpoints Runtime
 
-- `POST /api/v1/sbc/opensips/heartbeat`
-- `POST /api/v1/sbc/opensips/bootstrap`
-- `POST /api/v1/sbc/opensips/auth`
-- `POST /api/v1/sbc/opensips/route`
-- `POST /api/v1/sbc/opensips/accounting`
+- `POST /api/v1/sbc/runtime/heartbeat`
+- `POST /api/v1/sbc/runtime/bootstrap`
+- `POST /api/v1/sbc/runtime/auth`
+- `POST /api/v1/sbc/runtime/route`
+- `POST /api/v1/sbc/runtime/accounting`
 
 O `node_uuid` pode ir via query string ou header `X-SBC-Node-UUID`. O token é gerado
 pelo instalador, enviado como `Authorization: Bearer <token>` no bootstrap e nas
@@ -41,8 +41,9 @@ bash scripts/install-opensips-sbc.sh
 
 O instalador:
 
-- aceita `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID` e `MNSCLOUD_SBC_API_TOKEN` quando o comando
-  é gerado pela API, persistindo esses valores antes do bootstrap;
+- aceita `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`, `MNSCLOUD_SBC_API_TOKEN` e
+  `MNSCLOUD_SBC_ENGINE` quando o comando é gerado pela API, persistindo esses valores antes do
+  bootstrap;
 - solicita a URL base da API na primeira execução manual e salva em `/etc/mnscloud/sbc/api.base`;
 - configura o repositório oficial OpenSIPS 3.6.x LTS antes da instalação;
   - Debian 12 Bookworm: `https://apt.opensips.org` com componente `3.6-releases` e keyring `/usr/share/keyrings/opensips.gpg`;
@@ -105,8 +106,9 @@ Para validar heartbeat:
 NODE_UUID="$(tr -d '[:space:]' < /etc/mnscloud/sbc/node.uuid)"
 API_TOKEN="$(tr -d '[:space:]' < /etc/mnscloud/sbc/api.token)"
 API_BASE="$(tr -d '[:space:]' < /etc/mnscloud/sbc/api.base)"
-curl -sS -X POST "${API_BASE}/api/v1/sbc/opensips/heartbeat?node_uuid=${NODE_UUID}" \
+curl -sS -X POST "${API_BASE}/api/v1/sbc/runtime/heartbeat?node_uuid=${NODE_UUID}&engine=opensips" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ${API_TOKEN}" \
-  --data '{"hostname":"sbc-dev1"}'
+  -H "X-SBC-Engine: opensips" \
+  --data '{"engine":"opensips","hostname":"sbc-dev1"}'
 ```

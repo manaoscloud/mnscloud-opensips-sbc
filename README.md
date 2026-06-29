@@ -31,7 +31,7 @@ contract. It can run on MNSCloud, customer, or partner infrastructure.
 - API base URL: `/etc/mnscloud/sbc/api.base`
 - OpenSIPS config: `/etc/opensips/opensips.cfg`
 - Config validation: `opensips -C -f /etc/opensips/opensips.cfg`
-- Runtime API: `/api/v1/sbc/opensips/*`
+- Runtime API: `/api/v1/sbc/runtime/*`
 - Runtime engine: `opensips`
 - Optional media relay: API-selected `RealtimeMediaServer` exposed to OpenSIPS as an
   `rtpengineSocket`.
@@ -86,6 +86,8 @@ when possible, and keeps the original `/etc/opensips/opensips.cfg` as
 
 API-generated commands may pass `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`, and
 `MNSCLOUD_SBC_API_TOKEN`; when present, the installer persists those values before bootstrapping.
+`MNSCLOUD_SBC_ENGINE` may override the default `opensips` engine for future SBC engines that
+implement the same runtime contract.
 When the API returns `rtpengineSocket`, the installer stores it in
 `/etc/mnscloud/sbc/media.socket` and enables OpenSIPS `rtpengine` handling in the generated
 configuration. Without an assigned media relay, OpenSIPS runs as SIP signaling/SBC only.

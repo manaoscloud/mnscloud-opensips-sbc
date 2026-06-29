@@ -25,10 +25,10 @@ monorepo at runtime.
 
 - Product repository: `manaoscloud/mnscloud-opensips-sbc`
 - Local installer: `scripts/install-opensips-sbc.sh`
-- Runtime API consumer: MNSCloud SBC OpenSIPS endpoints under `/api/v1/sbc/opensips/*`
+- Runtime API consumer: MNSCloud SBC runtime endpoints under `/api/v1/sbc/runtime/*`
 - Local state prefix: `/etc/mnscloud/sbc`
-- Runtime command environment: `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`, and
-  `MNSCLOUD_SBC_API_TOKEN`
+- Runtime command environment: `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`,
+  `MNSCLOUD_SBC_API_TOKEN`, and optional `MNSCLOUD_SBC_ENGINE`
 - Media relay contract: OpenSIPS must use API-selected `RealtimeMediaServer` data only. When the
   API returns `rtpengineSocket`, persist it in `/etc/mnscloud/sbc/media.socket` and enable
   OpenSIPS `rtpengine`; do not hardcode media relay addresses in this public connector.
