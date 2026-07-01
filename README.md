@@ -134,8 +134,11 @@ See `opensips.md` and `SECURITY.md` for details.
 
 ## Runtime Behavior
 
-- OpenSIPS owns SIP signaling, pipe lookup, media entry points, and topology control.
+- OpenSIPS owns SIP signaling, runtime pipe lookup payload collection, media entry points, and
+  topology control.
 - RTP/SRTP media anchoring is delegated to the reusable `mnscloud-media` runtime through
   `rtpengine` when the API assigns a media relay to this SBC server.
 - Codec policy is represented in SBC pipes and must remain API/control-plane driven; the
   connector applies only the runtime instructions returned by the API contract.
+- Pipe lookup is multi-criteria and API-controlled. The connector sends source/local/RURI/From/To
+  context; the API must return exactly one authorized pipe or fail closed on ambiguity.

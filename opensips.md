@@ -34,6 +34,12 @@ O `node_uuid` pode ir via query string ou header `X-SBC-Node-UUID`. O token é g
 pelo instalador, enviado como `Authorization: Bearer <token>` no bootstrap e nas
 consultas runtime, e somente o hash fica salvo no banco.
 
+O lookup de `pipe` envia contexto SIP suficiente para roteamento multi-tenant por IP, DID/prefixo
+ou domínio opcional: direção, destino/RURI, IP/porta/transporte de origem, IP/porta local, From,
+To, R-URI domain e usuário de autenticação quando disponível. A API/control plane escolhe um único
+`VoipSbcPipe` por prioridade e score de match; empates são tratados como ambiguidade e a chamada
+não deve ser encaminhada automaticamente.
+
 ## Instalação
 
 ```bash
@@ -62,7 +68,7 @@ O instalador:
 - habilita `rtpengine.so` e `rtpengine_offer/answer/delete` apenas quando existe media relay associado;
 - define `mpath` no `opensips.cfg` conforme a distro/arquitetura para carregar os módulos oficiais instalados em `/usr/lib/<multiarch>/opensips/modules/` ou `/usr/lib64/opensips/modules/`.
 - carrega explicitamente `proto_udp.so` e `proto_tcp.so`, exigidos pelo OpenSIPS 3.6 para escutar nos sockets SIP UDP/TCP.
-- usa `sl_send_reply()` do módulo `sl.so` e `rest_post()` no formato OpenSIPS 3.6 para consultar a API de roteamento.
+- usa `sl_send_reply()` do módulo `sl.so` e `rest_post()` no formato OpenSIPS 3.6 para consultar a API de roteamento com contexto SIP completo.
 
 ## Audio, media e codecs
 
