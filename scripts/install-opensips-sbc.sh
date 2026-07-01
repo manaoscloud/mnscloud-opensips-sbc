@@ -342,7 +342,7 @@ ${rtpengine_bye}
 
   if (is_method(\"INVITE\")) {
     xlog(\"L_INFO\", \"mnscloud SBC pipe lookup for \$rU from \$si\\n\");
-    \$var(pipe_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"direction\\\":\\\"inbound\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$pr + \"\\\",\\\"local_ip\\\":\\\"\" + \$Ri + \"\\\",\\\"local_port\\\":\" + \$Rp + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"auth_username\\\":\\\"\" + \$au + \"\\\"}\";
+    \$var(pipe_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"direction\\\":\\\"inbound\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"auth_username\\\":\\\"\" + \$au + \"\\\"}\";
     rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
     rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
     \$var(rest_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/pipe?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(pipe_payload), \"application/json\", \$var(body), \$var(ct), \$var(http_code));

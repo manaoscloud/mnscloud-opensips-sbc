@@ -142,3 +142,5 @@ See `opensips.md` and `SECURITY.md` for details.
   connector applies only the runtime instructions returned by the API contract.
 - Pipe lookup is multi-criteria and API-controlled. The connector sends source/local/RURI/From/To
   context; the API must return exactly one authorized pipe or fail closed on ambiguity.
+- The generated OpenSIPS 3.6 config uses `$si`/`$sp` for the remote source and
+  `$socket_in(proto|ip|port)` for the received local socket context.

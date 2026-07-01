@@ -69,6 +69,7 @@ O instalador:
 - define `mpath` no `opensips.cfg` conforme a distro/arquitetura para carregar os módulos oficiais instalados em `/usr/lib/<multiarch>/opensips/modules/` ou `/usr/lib64/opensips/modules/`.
 - carrega explicitamente `proto_udp.so` e `proto_tcp.so`, exigidos pelo OpenSIPS 3.6 para escutar nos sockets SIP UDP/TCP.
 - usa `sl_send_reply()` do módulo `sl.so` e `rest_post()` no formato OpenSIPS 3.6 para consultar a API de roteamento com contexto SIP completo.
+- usa `$si`/`$sp` para origem remota e `$socket_in(proto|ip|port)` para o socket local recebido, conforme as pseudo-variáveis oficiais do OpenSIPS 3.6.
 
 ## Audio, media e codecs
 
