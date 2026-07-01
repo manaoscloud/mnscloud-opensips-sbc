@@ -341,13 +341,13 @@ route {
 ${rtpengine_bye}
 
   if (is_method(\"INVITE\")) {
-    xlog(\"L_INFO\", \"mnscloud SBC route lookup for \$rU from \$si\\n\");
-    \$var(route_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\"}\";
+    xlog(\"L_INFO\", \"mnscloud SBC pipe lookup for \$rU from \$si\\n\");
+    \$var(pipe_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\"}\";
     rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
     rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
-    \$var(rest_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/route?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(route_payload), \"application/json\", \$var(body), \$var(ct), \$var(http_code));
-    if (\$var(rest_rc) < 0) { sl_send_reply(503, \"Route lookup failed\"); exit; }
-    if (\$var(http_code) != 200) { sl_send_reply(503, \"Route lookup failed\"); exit; }
+    \$var(rest_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/pipe?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(pipe_payload), \"application/json\", \$var(body), \$var(ct), \$var(http_code));
+    if (\$var(rest_rc) < 0) { sl_send_reply(503, \"Pipe lookup failed\"); exit; }
+    if (\$var(http_code) != 200) { sl_send_reply(503, \"Pipe lookup failed\"); exit; }
 ${rtpengine_offer}
   }
 

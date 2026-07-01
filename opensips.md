@@ -17,16 +17,17 @@ Este diretório documenta o uso do OpenSIPS como SBC do mnscloud.
 - `VoipSbcServer`: servidores OpenSIPS/Kamailio/SBC autorizados no master.
 - `VoipSbcServer.RealtimeMediaServerRmsUUID`: servidor `mnscloud-media` usado para ancorar RTP/SRTP quando necessário.
 - `VoipSbcAccount`: conta SBC do tenant associada a um servidor SBC master.
-- `VoipSbcTrunk`: trunks vinculados à conta SBC.
-- `VoipSbcRoute`: rotas por prefixo/trunk/prioridade.
-- `VoipSbcPolicy`: políticas ACL, rate, codec, NAT, header e routing.
+- `VoipSbcInterface`: interfaces SIP locais de entrada/saída do SBC.
+- `VoipSbcPeer`: destinos SIP remotos, autenticação e limites operacionais.
+- `VoipSbcPipe`: fluxo SIP B2B que liga interface, peer, mídia, codecs e comportamento operacional.
+- `VoipSbcManipulation`: manipulações SIP vinculadas ao pipe.
 
 ## Endpoints Runtime
 
 - `POST /api/v1/sbc/runtime/heartbeat`
 - `POST /api/v1/sbc/runtime/bootstrap`
 - `POST /api/v1/sbc/runtime/auth`
-- `POST /api/v1/sbc/runtime/route`
+- `POST /api/v1/sbc/runtime/pipe`
 - `POST /api/v1/sbc/runtime/accounting`
 
 O `node_uuid` pode ir via query string ou header `X-SBC-Node-UUID`. O token é gerado
@@ -70,9 +71,9 @@ O instalador:
   `RealtimeMediaServer` associado.
 - Sem `RealtimeMediaServer`, o SBC sinaliza chamadas sem media relay e o RTP depende do caminho
   direto entre as pontas.
-- Políticas de codec ficam no control plane (`VoipSbcPolicy` tipo `codec`) e devem ser aplicadas
-  conforme instruções retornadas pela API. O padrão operacional é codec pass-through; transcoding
-  deve ser tratado como exceção explícita por política/capacidade.
+- Políticas de codec ficam no control plane do `VoipSbcPipe` e devem ser aplicadas conforme
+  instruções retornadas pela API. O padrão operacional é codec pass-through; transcoding deve ser
+  tratado como exceção explícita por capacidade do media relay e decisão do master.
 
 ## Validação, atualização e rollback
 
