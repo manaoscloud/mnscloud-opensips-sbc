@@ -10,6 +10,7 @@ NODE_UUID_FILE="/etc/mnscloud/sbc/node.uuid"
 API_TOKEN_FILE="/etc/mnscloud/sbc/api.token"
 API_BASE_FILE="/etc/mnscloud/sbc/api.base"
 MEDIA_SOCKET_FILE="/etc/mnscloud/sbc/media.socket"
+DBTEXT_DIR="/etc/mnscloud/sbc/dbtext"
 DEFAULT_API_BASE="${MNSCLOUD_API_BASE:-https://api.example.com}"
 SBC_ENGINE="${MNSCLOUD_SBC_ENGINE:-opensips}"
 NODE_UUID="${MNSCLOUD_SBC_NODE_UUID:-}"
@@ -288,12 +289,28 @@ opensips_module_path() {
 }
 
 write_opensips_config() {
-  local cfg="/etc/opensips/opensips.cfg" module_path sip_i_modules="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply=""
+  local cfg="/etc/opensips/opensips.cfg" module_path sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply=""
   module_path="$(opensips_module_path)"
   if [[ -r "${module_path%/}/sip_i.so" ]]; then
     sip_i_modules='loadmodule "sip_i.so"'
   else
     warn "OpenSIPS sip_i module not found at ${module_path%/}/sip_i.so; SIP-I payload interworking will stay disabled until the package provides it"
+  fi
+  if [[ -r "${module_path%/}/db_text.so" && -r "${module_path%/}/uac.so" && -r "${module_path%/}/uac_auth.so" && -r "${module_path%/}/uac_registrant.so" && -r "${module_path%/}/mi_fifo.so" ]]; then
+    uac_modules='loadmodule "db_text.so"
+loadmodule "uac_auth.so"
+loadmodule "uac.so"
+loadmodule "uac_registrant.so"
+loadmodule "mi_fifo.so"'
+    uac_params="modparam(\"db_text\", \"db_mode\", 1)
+modparam(\"uac_registrant\", \"db_url\", \"text://${DBTEXT_DIR}\")
+modparam(\"uac_registrant\", \"table_name\", \"registrant\")
+modparam(\"uac_registrant\", \"timer_interval\", 30)
+modparam(\"uac_registrant\", \"failure_retry_interval\", 60)
+modparam(\"mi_fifo\", \"fifo_name\", \"/tmp/opensips_sbc_fifo\")
+modparam(\"mi_fifo\", \"fifo_mode\", 0600)"
+  else
+    warn "OpenSIPS db_text/uac/uac_auth/uac_registrant/mi_fifo modules not found; active REGISTER peers will stay disabled until the modules are installed"
   fi
   if [[ -n "${MEDIA_SOCKET}" ]]; then
     [[ -r "${module_path%/}/rtpengine.so" ]] ||
@@ -337,8 +354,10 @@ loadmodule \"sipmsgops.so\"
 loadmodule \"rest_client.so\"
 loadmodule \"json.so\"
 ${sip_i_modules}
+${uac_modules}
 ${rtpengine_modules}
 
+${uac_params}
 ${rtpengine_params}
 
 route {
@@ -354,6 +373,12 @@ ${rtpengine_bye}
     \$var(rest_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/pipe?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(pipe_payload), \"application/json\", \$var(body), \$var(ct), \$var(http_code));
     if (\$var(rest_rc) < 0) { sl_send_reply(503, \"Pipe lookup failed\"); exit; }
     if (\$var(http_code) != 200) { sl_send_reply(503, \"Pipe lookup failed\"); exit; }
+    \$json(pipe) := \$var(body);
+    if (\$json(pipe/allowed) != \"true\") { sl_send_reply(403, \"Pipe not allowed\"); exit; }
+    if (\$json(pipe/host) == NULL || \$json(pipe/port) == NULL) { sl_send_reply(503, \"Pipe target missing\"); exit; }
+    \$var(dst_transport) = \$json(pipe/transport);
+    if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
+    \$du = \"sip:\" + \$json(pipe/host) + \":\" + \$json(pipe/port) + \";transport=\" + \$var(dst_transport);
 ${rtpengine_offer}
   }
 
@@ -371,6 +396,16 @@ enable_service() {
   run "systemctl is-active opensips"
 }
 
+sync_runtime_config() {
+  local sync_script="${SCRIPT_DIR}/sync-opensips-sbc-runtime.sh"
+  [[ -x "${sync_script}" ]] || run "chmod +x '${sync_script}'"
+  if [[ "$DRY_RUN" == true ]]; then
+    log DRY "bash '${sync_script}' --dry-run"
+    return 0
+  fi
+  bash "${sync_script}"
+}
+
 main() {
   require_root
   echo "opensips         SBC - OpenSIPS 3.6.x (official repository)"
@@ -384,8 +419,9 @@ main() {
   ensure_node_uuid_file
   ensure_api_token_file
   case "$(detect_opensips_os)" in debian) install_packages_debian ;; rocky) install_packages_rocky ;; esac
-  load_media_socket_file
   bootstrap_node_via_api || true
+  sync_runtime_config || warn "SBC runtime config sync failed; installer will continue with the last local runtime state if present"
+  load_media_socket_file
   write_opensips_config
   enable_service
   ok "OpenSIPS SBC installed. Node UUID: ${NODE_UUID}"

@@ -27,7 +27,9 @@ Este diretório documenta o uso do OpenSIPS como SBC do mnscloud.
 - `POST /api/v1/sbc/runtime/heartbeat`
 - `POST /api/v1/sbc/runtime/bootstrap`
 - `POST /api/v1/sbc/runtime/auth`
+- `POST /api/v1/sbc/runtime/config`
 - `POST /api/v1/sbc/runtime/pipe`
+- `POST /api/v1/sbc/runtime/peer-status`
 - `POST /api/v1/sbc/runtime/accounting`
 
 O `node_uuid` pode ir via query string ou header `X-SBC-Node-UUID`. O token é gerado
@@ -39,6 +41,11 @@ ou domínio opcional: direção, destino/RURI, IP/porta/transporte de origem, IP
 To, R-URI domain e usuário de autenticação quando disponível. A API/control plane escolhe um único
 `VoipSbcPipe` por prioridade e score de match; empates são tratados como ambiguidade e a chamada
 não deve ser encaminhada automaticamente.
+
+O endpoint `runtime/config` é exclusivo do runtime autenticado do SBC. Ele entrega a configuração
+ativa de interfaces, peers e pipes para o servidor autorizado, incluindo credenciais necessárias
+para `REGISTER` ativo. Essas credenciais não são expostas ao app tenant e ficam gravadas localmente
+em arquivos protegidos sob `/etc/mnscloud/sbc`.
 
 ## Instalação
 
@@ -60,6 +67,9 @@ O instalador:
 - cria ou reaproveita `/etc/mnscloud/sbc/node.uuid`;
 - cria ou reaproveita `/etc/mnscloud/sbc/api.token`;
 - tenta vincular o node UUID via API bootstrap usando hostname, IPv4 privado e IPv4 público descoberto;
+- sincroniza a configuração runtime via `scripts/sync-opensips-sbc-runtime.sh`;
+- gera `/etc/mnscloud/sbc/runtime/config.json` com a configuração ativa retornada pela API;
+- gera `/etc/mnscloud/sbc/dbtext/registrant` para o módulo oficial `uac_registrant`;
 - não executa SQL direto nem instala cliente MariaDB para vincular o node UUID;
 - faz backup de `/etc/opensips/opensips.cfg` como `.bkp`;
 - gera uma configuração limpa mínima para consulta HTTP ao mnscloud;
@@ -70,6 +80,23 @@ O instalador:
 - carrega explicitamente `proto_udp.so` e `proto_tcp.so`, exigidos pelo OpenSIPS 3.6 para escutar nos sockets SIP UDP/TCP.
 - usa `sl_send_reply()` do módulo `sl.so` e `rest_post()` no formato OpenSIPS 3.6 para consultar a API de roteamento com contexto SIP completo.
 - usa `$si`/`$sp` para origem remota e `$socket_in(proto|ip|port)` para o socket local recebido, conforme as pseudo-variáveis oficiais do OpenSIPS 3.6.
+- carrega `db_text.so`, `uac_auth.so`, `uac.so`, `uac_registrant.so` e `mi_fifo.so` quando os
+  módulos existem no host; se algum deles estiver ausente, o instalador avisa e não habilita
+  `REGISTER` ativo para evitar configuração quebrada.
+
+## Autenticação de peers
+
+- `ip`: usado para peers por IP. A API decide o pipe por contexto de origem/local/destino, e o
+  runtime só encaminha quando a resposta vem como `allowed=true`.
+- `register`: o sync gera registros no `db_text` local para o `uac_registrant`, usando
+  registrar/AOR/contact/usuário/senha vindos do control plane.
+- `ip_digest`: reservado para operadoras que exigem IP fixo mais desafio digest em chamadas
+  originadas; a política fica no control plane e deve ser tratada como caso explícito.
+- `none`: somente para cenários internos controlados, nunca como padrão de operadora externa.
+
+O estado de registro e health deve ser reportado para `/api/v1/sbc/runtime/peer-status`. O
+`uac_registrant` mantém estados internos consultáveis via MI; o contrato do mnscloud armazena o
+resultado consolidado em `VoipSbcPeer`.
 
 ## Audio, media e codecs
 

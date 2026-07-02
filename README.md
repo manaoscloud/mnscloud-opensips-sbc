@@ -33,6 +33,8 @@ contract. It can run on MNSCloud, customer, or partner infrastructure.
 - Config validation: `opensips -C -f /etc/opensips/opensips.cfg`
 - Runtime API: `/api/v1/sbc/runtime/*`
 - Runtime engine: `opensips`
+- Runtime config cache: `/etc/mnscloud/sbc/runtime/config.json`
+- OpenSIPS local db_text: `/etc/mnscloud/sbc/dbtext`
 - Optional media relay: API-selected `RealtimeMediaServer` exposed to OpenSIPS as an
   `rtpengineSocket`.
 
@@ -82,9 +84,10 @@ sudo bash scripts/install-opensips-sbc.sh --dry-run
 ```
 
 The installer creates or reuses `/etc/mnscloud/sbc/node.uuid`, `/etc/mnscloud/sbc/api.token`, and
-`/etc/mnscloud/sbc/api.base`, writes the OpenSIPS configuration, validates bootstrap against the API
-when possible, and keeps the original `/etc/opensips/opensips.cfg` as
-`/etc/opensips/opensips.cfg.bkp`.
+`/etc/mnscloud/sbc/api.base`, validates bootstrap against the API when possible, syncs runtime
+configuration into `/etc/mnscloud/sbc/runtime/config.json`, generates the local OpenSIPS `db_text`
+registrant table for active REGISTER peers, writes the OpenSIPS configuration, and keeps the
+original `/etc/opensips/opensips.cfg` as `/etc/opensips/opensips.cfg.bkp`.
 
 API-generated commands may pass `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`, and
 `MNSCLOUD_SBC_API_TOKEN`; when present, the installer persists those values before bootstrapping.
@@ -122,6 +125,24 @@ sudo bash scripts/update-latest-opensips-sbc.sh stable
 Both update flows fetch the repository, checkout the target ref, rerun the installer, and then run
 the validator. Existing local state under `/etc/mnscloud/sbc` is reused.
 
+## Runtime Sync
+
+```bash
+sudo bash scripts/sync-opensips-sbc-runtime.sh
+```
+
+The sync command calls `POST /api/v1/sbc/runtime/config` using the local node UUID and API token.
+It updates:
+
+- `/etc/mnscloud/sbc/runtime/config.json`
+- `/etc/mnscloud/sbc/runtime/summary.json`
+- `/etc/mnscloud/sbc/dbtext/version`
+- `/etc/mnscloud/sbc/dbtext/registrant`
+- `/etc/mnscloud/sbc/media.socket`, when the API assigns an RTP engine socket
+
+Files are owned by `root:root` and written as `0640`. Runtime secrets are consumed only by the SBC
+host and are not embedded in public documentation or frontend code.
+
 ## Rollback
 
 ```bash
@@ -146,6 +167,8 @@ See `opensips.md` and `SECURITY.md` for details.
   IP authentication must be backed by explicit allowed source addresses. REGISTER and OPTIONS
   status must be reported back to `/api/v1/sbc/runtime/peer-status`; tenant users should not edit
   runtime health fields directly.
+- REGISTER peers are exported to the official OpenSIPS `uac_registrant` module through a local
+  `db_text` database generated from the authenticated runtime config endpoint.
 - SIP-I/SIP-T is represented by peer/pipe signaling profiles. OpenSIPS 3.6 uses the official
   `sip_i.so` module when available from the installed package. If the module is absent, the
   installer warns and keeps SIP-I payload interworking disabled instead of generating a broken
