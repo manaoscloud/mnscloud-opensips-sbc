@@ -478,8 +478,8 @@ Description=Run MNSCloud OpenSIPS SBC runtime sync
 
 [Timer]
 OnBootSec=30s
-OnUnitActiveSec=60s
-AccuracySec=10s
+OnUnitActiveSec=10min
+AccuracySec=30s
 Persistent=true
 
 [Install]

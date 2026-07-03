@@ -150,10 +150,12 @@ Files are owned by `root:root` and written as `0640`. Runtime secrets are consum
 host and are not embedded in public documentation or frontend code.
 
 For installed servers, `mnscloud-opensips-sbc-sync.timer` runs
-`scripts/sync-and-reload-opensips-sbc.sh` every minute. The wrapper compares the generated
-registrant table before and after sync and calls the official OpenSIPS MI `reg_reload` command over
-the local FIFO when REGISTER peers changed. `opensips.service` is restarted only for static runtime
-changes that cannot be applied by MI, such as a changed media socket.
+`scripts/sync-and-reload-opensips-sbc.sh` every 10 minutes as a fallback reconciler. Normal
+configuration changes should arrive immediately through the MNSCloud Agent `voip.sbc.runtime` job.
+The wrapper compares the generated registrant table before and after sync and calls the official
+OpenSIPS MI `reg_reload` command over the local FIFO when REGISTER peers changed.
+`opensips.service` is restarted only for static runtime changes that cannot be applied by MI, such
+as a changed media socket.
 
 OpenSIPS MI commands should be executed through the repository helper so the reply FIFO is created
 with the same ownership and permissions as the installed service:
