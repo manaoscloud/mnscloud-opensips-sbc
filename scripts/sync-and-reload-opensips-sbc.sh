@@ -32,7 +32,7 @@ opensips_group() {
 }
 
 run_mi() {
-  local method="$1" params_json="${2:-{}}" request_id reply_name reply_fifo reply_body response payload
+  local method="$1" request_id reply_name reply_fifo reply_body response payload params_json arg key value
   shift || true
   [[ -p "${MI_FIFO_FILE}" ]] ||
     { err "OpenSIPS MI FIFO not found: ${MI_FIFO_FILE}"; return 1; }
@@ -43,6 +43,18 @@ run_mi() {
   reply_name="mnscloud_sbc_reply_$$"
   reply_fifo="${MI_FIFO_DIR}/${reply_name}"
   reply_body="$(mktemp)"
+  params_json="{}"
+
+  for arg in "$@"; do
+    if [[ "${arg}" != *=* ]]; then
+      err "Invalid OpenSIPS MI parameter '${arg}'. Use name=value."
+      return 2
+    fi
+    key="${arg%%=*}"
+    value="${arg#*=}"
+    params_json="$(jq --arg key "${key}" --arg value "${value}" '. + {($key): $value}' <<<"${params_json}")"
+  done
+
   if [[ "${params_json}" == "{}" ]]; then
     payload="$(jq -nc --arg method "${method}" --arg id "${request_id}" '{jsonrpc:"2.0", method:$method, id:$id}')"
   else
@@ -107,9 +119,7 @@ force_active_registrants() {
     | @tsv
   ' "${config_file}" | while IFS=$'\t' read -r aor contact registrar; do
     [[ -n "${aor}" && -n "${contact}" && -n "${registrar}" ]] || continue
-    local payload
-    payload="$(jq -nc --arg aor "${aor}" --arg contact "${contact}" --arg registrar "${registrar}" '{aor:$aor, contact:$contact, registrar:$registrar}')"
-    run_mi reg_force_register "${payload}" || return 1
+    run_mi reg_force_register "aor=${aor}" "contact=${contact}" "registrar=${registrar}" || return 1
   done
 }
 
