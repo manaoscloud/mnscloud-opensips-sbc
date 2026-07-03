@@ -365,7 +365,7 @@ modparam(\"uac_registrant\", \"table_name\", \"registrant\")
 modparam(\"uac_registrant\", \"timer_interval\", 30)
 modparam(\"uac_registrant\", \"failure_retry_interval\", 60)
 modparam(\"mi_fifo\", \"fifo_name\", \"${MI_FIFO_FILE}\")
-modparam(\"mi_fifo\", \"reply_dir\", \"${MI_FIFO_DIR}\")
+modparam(\"mi_fifo\", \"reply_dir\", \"${MI_FIFO_DIR}/\")
 modparam(\"mi_fifo\", \"fifo_mode\", 0660)"
   else
     warn "OpenSIPS db_text/uac/uac_auth/uac_registrant/mi_fifo modules not found; active REGISTER peers will stay disabled until the modules are installed"

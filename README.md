@@ -163,6 +163,11 @@ sudo bash scripts/opensips-sbc-mi.sh reg_list
 sudo bash scripts/opensips-sbc-mi.sh reg_reload
 ```
 
+The installed `mi_fifo` configuration keeps the command FIFO at
+`/run/opensips/mnscloud_sbc_fifo` and the reply directory at `/run/opensips/`. Keep the trailing
+slash in the `reply_dir` value; OpenSIPS builds the reply FIFO path from that directory and the
+reply FIFO name sent in the MI command.
+
 ## Rollback
 
 ```bash
