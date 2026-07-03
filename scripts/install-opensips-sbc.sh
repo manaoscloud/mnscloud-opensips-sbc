@@ -264,6 +264,27 @@ install_packages_rocky() {
 }
 backup_once() { local file="$1"; [[ -f "$file" && ! -f "${file}.bkp" ]] && run "cp -a '${file}' '${file}.bkp'" || true; }
 
+opensips_group() {
+  if getent group opensips >/dev/null 2>&1; then
+    printf "opensips"
+  else
+    printf "root"
+  fi
+}
+
+ensure_opensips_dbtext_permissions() {
+  local group
+  [[ -d "${DBTEXT_DIR}" ]] || return 0
+  group="$(opensips_group)"
+  run "chown root:${group} '${DBTEXT_DIR}'"
+  run "chmod 0750 '${DBTEXT_DIR}'"
+  for file in "${DBTEXT_DIR}/version" "${DBTEXT_DIR}/registrant"; do
+    [[ -f "${file}" ]] || continue
+    run "chown root:${group} '${file}'"
+    run "chmod 0640 '${file}'"
+  done
+}
+
 opensips_module_path() {
   local arch
   if command -v dpkg-architecture >/dev/null 2>&1; then
@@ -421,6 +442,7 @@ main() {
   case "$(detect_opensips_os)" in debian) install_packages_debian ;; rocky) install_packages_rocky ;; esac
   bootstrap_node_via_api || true
   sync_runtime_config || warn "SBC runtime config sync failed; installer will continue with the last local runtime state if present"
+  ensure_opensips_dbtext_permissions
   load_media_socket_file
   write_opensips_config
   enable_service

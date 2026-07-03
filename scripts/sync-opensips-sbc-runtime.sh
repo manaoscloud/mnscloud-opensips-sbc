@@ -36,6 +36,28 @@ write_secure_file() {
   run "chmod 0640 '$file'"
 }
 
+opensips_group() {
+  if getent group opensips >/dev/null 2>&1; then
+    printf "opensips"
+  else
+    printf "root"
+  fi
+}
+
+secure_dbtext_path() {
+  local group
+  group="$(opensips_group)"
+  run "chown root:${group} '${DBTEXT_DIR}'"
+  run "chmod 0750 '${DBTEXT_DIR}'"
+}
+
+secure_dbtext_file() {
+  local file="$1" group
+  group="$(opensips_group)"
+  run "chown root:${group} '${file}'"
+  run "chmod 0640 '${file}'"
+}
+
 sync_runtime_config() {
   local node_uuid api_token api_base response_file http_code
   node_uuid="$(read_required_file "$NODE_UUID_FILE" "Node UUID")"
@@ -44,10 +66,12 @@ sync_runtime_config() {
 
   run "install -d -m 0750 '${RUNTIME_DIR}' '${DBTEXT_DIR}'"
   run "chown root:root '${RUNTIME_DIR}' '${DBTEXT_DIR}'"
+  secure_dbtext_path
 
   response_file="$(mktemp)"
   http_code="$(curl -sS -o "${response_file}" -w "%{http_code}" -X POST "${api_base}/api/v1/sbc/runtime/config?node_uuid=${node_uuid}&engine=${SBC_ENGINE}" -H "Content-Type: application/json" -H "Authorization: Bearer ${api_token}" -H "X-SBC-Engine: ${SBC_ENGINE}" --data "{\"engine\":\"${SBC_ENGINE}\"}" 2>>"${LOG_FILE}")"
   if [[ "$http_code" != "200" ]]; then
+    warn "SBC runtime config response: $(tr -d '\n\r' < "$response_file" | cut -c1-500)"
     rm -f "$response_file"
     err "SBC runtime config sync failed with HTTP ${http_code}"
     return 1
@@ -75,8 +99,7 @@ write_dbtext_version() {
 table_name(string) table_version(int) 
 registrant:3
 EOF
-  run "chown root:root '${DBTEXT_DIR}/version'"
-  run "chmod 0640 '${DBTEXT_DIR}/version'"
+  secure_dbtext_file "${DBTEXT_DIR}/version"
 }
 
 write_dbtext_registrant() {
@@ -155,8 +178,7 @@ EOF
     | join(":")
   ' "$CONFIG_FILE" >> "${DBTEXT_DIR}/registrant"
 
-  run "chown root:root '${DBTEXT_DIR}/registrant'"
-  run "chmod 0640 '${DBTEXT_DIR}/registrant'"
+  secure_dbtext_file "${DBTEXT_DIR}/registrant"
 }
 
 write_summary() {
