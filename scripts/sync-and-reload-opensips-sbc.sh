@@ -46,7 +46,7 @@ run_mi() {
   if [[ "${params_json}" == "{}" ]]; then
     payload="$(jq -nc --arg method "${method}" --arg id "${request_id}" '{jsonrpc:"2.0", method:$method, id:$id}')"
   else
-    payload="$(jq -nc --arg method "${method}" --arg id "${request_id}" --argjson params "${params_json}" '{jsonrpc:"2.0", method:$method, params:$params, id:$id}')"
+    payload="$(printf '%s' "${params_json}" | jq -c --arg method "${method}" --arg id "${request_id}" '{jsonrpc:"2.0", method:$method, params:., id:$id}')"
   fi
 
   rm -f "${reply_fifo}"
@@ -109,6 +109,11 @@ force_active_registrants() {
       }
     | select(.aor != "" and .contact != "" and .registrar != "")
   ' "${config_file}" | while IFS= read -r record; do
+    [[ -n "${record//[[:space:]]/}" ]] || continue
+    if ! printf '%s' "${record}" | jq -e 'type == "object" and (.aor | length > 0) and (.contact | length > 0) and (.registrar | length > 0)' >/dev/null; then
+      warn "Skipping invalid OpenSIPS registrant force payload: ${record}"
+      continue
+    fi
     run_mi reg_force_register "${record}" || return 1
   done
 }

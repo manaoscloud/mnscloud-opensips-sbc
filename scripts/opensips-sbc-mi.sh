@@ -71,7 +71,7 @@ main() {
   if [[ "${params_json}" == "{}" ]]; then
     payload="$(jq -nc --arg method "${METHOD}" --arg id "${request_id}" '{jsonrpc:"2.0", method:$method, id:$id}')"
   else
-    payload="$(jq -nc --arg method "${METHOD}" --arg id "${request_id}" --argjson params "${params_json}" '{jsonrpc:"2.0", method:$method, params:$params, id:$id}')"
+    payload="$(printf '%s' "${params_json}" | jq -c --arg method "${METHOD}" --arg id "${request_id}" '{jsonrpc:"2.0", method:$method, params:., id:$id}')"
   fi
 
   rm -f "${reply_fifo}"
