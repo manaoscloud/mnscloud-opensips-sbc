@@ -397,6 +397,8 @@ onreply_route[MNSCLOUD_RTPENGINE_REPLY] {
 log_level=3
 xlog_level=3
 udp_workers=4
+server_header="Server: MNSCloud OpenSIPS SBC"
+user_agent_header="User-Agent: MNSCloud OpenSIPS SBC"
 socket=udp:0.0.0.0:5060
 socket=tcp:0.0.0.0:5060
 mpath=\"${module_path}\"

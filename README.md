@@ -101,6 +101,8 @@ implement the same runtime contract.
 When the API returns `rtpengineSocket`, the installer stores it in
 `/etc/mnscloud/sbc/media.socket` and enables OpenSIPS `rtpengine` handling in the generated
 configuration. Without an assigned media relay, OpenSIPS runs as SIP signaling/SBC only.
+The generated OpenSIPS configuration sets both SIP `Server` and `User-Agent` headers to
+`MNSCloud OpenSIPS SBC`.
 
 ## Validate
 
