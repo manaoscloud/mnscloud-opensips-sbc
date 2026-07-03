@@ -22,18 +22,44 @@ file_checksum() {
   fi
 }
 
+opensips_group() {
+  if getent group opensips >/dev/null 2>&1; then
+    printf "opensips"
+  else
+    printf "root"
+  fi
+}
+
 run_mi() {
-  command -v opensips-cli >/dev/null 2>&1 ||
-    { err "opensips-cli is required for realtime MI operations"; return 1; }
+  local method="$1" request_id reply_name reply_fifo reply_body response
+  shift || true
   [[ -p "${MI_FIFO_FILE}" ]] ||
     { err "OpenSIPS MI FIFO not found: ${MI_FIFO_FILE}"; return 1; }
 
-  opensips-cli \
-    -o communication_type=fifo \
-    -o fifo_file="${MI_FIFO_FILE}" \
-    -o fifo_reply_dir="${MI_FIFO_DIR}" \
-    -o output_type=none \
-    -x mi "$@" >>"${LOG_FILE}" 2>&1
+  request_id="mnscloud-$(date +%s)-$$"
+  reply_name="mnscloud_sbc_reply_$$"
+  reply_fifo="${MI_FIFO_DIR}/${reply_name}"
+  reply_body="$(mktemp)"
+
+  rm -f "${reply_fifo}"
+  mkfifo "${reply_fifo}"
+  chown "root:$(opensips_group)" "${reply_fifo}" 2>/dev/null || true
+  chmod 0660 "${reply_fifo}"
+
+  timeout 8s cat "${reply_fifo}" > "${reply_body}" &
+  local reader_pid="$!"
+  printf ':%s:{"jsonrpc":"2.0","method":"%s","id":"%s"}\n' "${reply_name}" "${method}" "${request_id}" > "${MI_FIFO_FILE}"
+  wait "${reader_pid}" || {
+    rm -f "${reply_fifo}" "${reply_body}"
+    err "OpenSIPS MI ${method} did not reply"
+    return 1
+  }
+
+  response="$(tr -d '\r\n' < "${reply_body}")"
+  rm -f "${reply_fifo}" "${reply_body}"
+  info "OpenSIPS MI ${method} response: ${response}"
+  [[ "${response}" != *'"error"'* ]] ||
+    { err "OpenSIPS MI ${method} returned an error"; return 1; }
 }
 
 reload_registrants_if_changed() {

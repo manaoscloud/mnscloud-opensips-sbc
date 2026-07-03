@@ -150,9 +150,9 @@ host and are not embedded in public documentation or frontend code.
 
 For installed servers, `mnscloud-opensips-sbc-sync.timer` runs
 `scripts/sync-and-reload-opensips-sbc.sh` every minute. The wrapper compares the generated
-registrant table before and after sync and calls the official OpenSIPS MI `reg_reload` command
-when REGISTER peers changed. `opensips.service` is restarted only for static runtime changes that
-cannot be applied by MI, such as a changed media socket.
+registrant table before and after sync and calls the official OpenSIPS MI `reg_reload` command over
+the local FIFO when REGISTER peers changed. `opensips.service` is restarted only for static runtime
+changes that cannot be applied by MI, such as a changed media socket.
 
 ## Rollback
 
