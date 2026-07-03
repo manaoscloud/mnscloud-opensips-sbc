@@ -10,36 +10,53 @@ RUNTIME_DIR="/etc/mnscloud/sbc/runtime"
 DBTEXT_DIR="/etc/mnscloud/sbc/dbtext"
 MEDIA_SOCKET_FILE="/etc/mnscloud/sbc/media.socket"
 OPENSIPS_CFG="/etc/opensips/opensips.cfg"
+MI_FIFO_DIR="/run/opensips"
+MI_FIFO_FILE="${MI_FIFO_DIR}/mnscloud_sbc_fifo"
 
-runtime_checksum() {
-  local files=(
-    "${RUNTIME_DIR}/config.json"
-    "${RUNTIME_DIR}/summary.json"
-    "${DBTEXT_DIR}/version"
-    "${DBTEXT_DIR}/registrant"
-    "${MEDIA_SOCKET_FILE}"
-  )
-  local file
-  for file in "${files[@]}"; do
-    if [[ -f "${file}" ]]; then
-      sha256sum "${file}"
-    else
-      printf 'missing  %s\n' "${file}"
-    fi
-  done | sha256sum | awk '{print $1}'
+file_checksum() {
+  local file="$1"
+  if [[ -f "${file}" ]]; then
+    sha256sum "${file}" | awk '{print $1}'
+  else
+    printf 'missing\n'
+  fi
 }
 
-reload_opensips_if_changed() {
+run_mi() {
+  command -v opensips-cli >/dev/null 2>&1 ||
+    { err "opensips-cli is required for realtime MI operations"; return 1; }
+  [[ -p "${MI_FIFO_FILE}" ]] ||
+    { err "OpenSIPS MI FIFO not found: ${MI_FIFO_FILE}"; return 1; }
+
+  opensips-cli \
+    -o communication_type=fifo \
+    -o fifo_file="${MI_FIFO_FILE}" \
+    -o fifo_reply_dir="${MI_FIFO_DIR}" \
+    -o output_type=none \
+    -x mi "$@" >>"${LOG_FILE}" 2>&1
+}
+
+reload_registrants_if_changed() {
   local before="$1" after="$2"
   if [[ "${before}" == "${after}" ]]; then
-    ok "SBC runtime unchanged; OpenSIPS restart not required"
+    ok "SBC registrants unchanged; OpenSIPS MI reload not required"
     return 0
   fi
 
+  run_mi reg_reload
+  ok "SBC registrants changed; OpenSIPS uac_registrant reloaded via MI"
+}
+
+restart_when_static_runtime_changed() {
+  local before="$1" after="$2"
+  if [[ "${before}" == "${after}" ]]; then
+    return 0
+  fi
+
+  warn "SBC media socket changed; OpenSIPS static config requires restart"
   run "opensips -C -f '${OPENSIPS_CFG}'"
   run "systemctl restart opensips"
   run "systemctl is-active opensips"
-  ok "SBC runtime changed; OpenSIPS restarted"
 }
 
 main() {
@@ -51,15 +68,18 @@ main() {
 
   if [[ "$DRY_RUN" == true ]]; then
     log DRY "bash '${SCRIPT_DIR}/sync-opensips-sbc-runtime.sh' --dry-run"
-    log DRY "restart opensips only when runtime files changed"
+    log DRY "reload uac_registrant through OpenSIPS MI only when registrants changed"
     return 0
   fi
 
-  local before after
-  before="$(runtime_checksum)"
+  local registrant_before registrant_after media_before media_after
+  registrant_before="$(file_checksum "${DBTEXT_DIR}/registrant")"
+  media_before="$(file_checksum "${MEDIA_SOCKET_FILE}")"
   bash "${SCRIPT_DIR}/sync-opensips-sbc-runtime.sh"
-  after="$(runtime_checksum)"
-  reload_opensips_if_changed "${before}" "${after}"
+  registrant_after="$(file_checksum "${DBTEXT_DIR}/registrant")"
+  media_after="$(file_checksum "${MEDIA_SOCKET_FILE}")"
+  reload_registrants_if_changed "${registrant_before}" "${registrant_after}"
+  restart_when_static_runtime_changed "${media_before}" "${media_after}"
 }
 
 main "$@"

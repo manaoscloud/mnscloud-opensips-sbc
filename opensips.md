@@ -88,13 +88,18 @@ O instalador:
 - carrega `db_text.so`, `uac_auth.so`, `uac.so`, `uac_registrant.so` e `mi_fifo.so` quando os
   módulos existem no host; se algum deles estiver ausente, o instalador avisa e não habilita
   `REGISTER` ativo para evitar configuração quebrada.
+- expõe MI FIFO em `/run/opensips/mnscloud_sbc_fifo`, evitando `/tmp` por causa das proteções de
+  FIFO em Linux moderno.
+- recarrega registros SIP com `opensips-cli -x mi reg_reload` quando o control plane altera peers
+  `register`, mantendo o processo OpenSIPS ativo.
 
 ## Autenticação de peers
 
 - `ip`: usado para peers por IP. A API identifica o Inbound por `VspAllowedSourceAddresses`
   e só encaminha quando encontra um pipe ativo e não ambíguo para o peer de saída.
 - `register`: o sync gera registros no `db_text` local para o `uac_registrant`, usando
-  registrar/AOR/contact/usuário/senha vindos do control plane.
+  registrar/AOR/contact/usuário/senha vindos do control plane. Como o módulo oficial mantém esses
+  registros em memória, alterações são aplicadas em runtime via MI `reg_reload`.
 - `ip_digest`: reservado para operadoras que exigem IP fixo mais desafio digest em chamadas
   originadas; a política fica no control plane e deve ser tratada como caso explícito.
 - `none`: somente para cenários internos controlados, nunca como padrão de operadora externa.

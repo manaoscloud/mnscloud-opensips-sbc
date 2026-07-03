@@ -149,9 +149,10 @@ Files are owned by `root:root` and written as `0640`. Runtime secrets are consum
 host and are not embedded in public documentation or frontend code.
 
 For installed servers, `mnscloud-opensips-sbc-sync.timer` runs
-`scripts/sync-and-reload-opensips-sbc.sh` every minute. The wrapper compares the runtime snapshot
-before and after sync and restarts `opensips.service` only when generated runtime files changed,
-which makes new REGISTER peers become active without reinstalling the SBC.
+`scripts/sync-and-reload-opensips-sbc.sh` every minute. The wrapper compares the generated
+registrant table before and after sync and calls the official OpenSIPS MI `reg_reload` command
+when REGISTER peers changed. `opensips.service` is restarted only for static runtime changes that
+cannot be applied by MI, such as a changed media socket.
 
 ## Rollback
 
@@ -178,7 +179,9 @@ See `opensips.md` and `SECURITY.md` for details.
   status must be reported back to `/api/v1/sbc/runtime/peer-status`; tenant users should not edit
   runtime health fields directly.
 - REGISTER peers are exported to the official OpenSIPS `uac_registrant` module through a local
-  `db_text` database generated from the authenticated runtime config endpoint.
+  `db_text` database generated from the authenticated runtime config endpoint. The local table is
+  an OpenSIPS module requirement; changes are applied at runtime through MI `reg_reload`, not by
+  reinstalling the SBC.
 - SIP-I/SIP-T is represented by peer/pipe signaling profiles. OpenSIPS 3.6 uses the official
   `sip_i.so` module when available from the installed package. If the module is absent, the
   installer warns and keeps SIP-I payload interworking disabled instead of generating a broken

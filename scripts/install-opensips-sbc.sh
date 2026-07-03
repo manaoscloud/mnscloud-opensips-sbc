@@ -11,6 +11,8 @@ API_TOKEN_FILE="/etc/mnscloud/sbc/api.token"
 API_BASE_FILE="/etc/mnscloud/sbc/api.base"
 MEDIA_SOCKET_FILE="/etc/mnscloud/sbc/media.socket"
 DBTEXT_DIR="/etc/mnscloud/sbc/dbtext"
+MI_FIFO_DIR="/run/opensips"
+MI_FIFO_FILE="${MI_FIFO_DIR}/mnscloud_sbc_fifo"
 DEFAULT_API_BASE="${MNSCLOUD_API_BASE:-https://api.example.com}"
 SBC_ENGINE="${MNSCLOUD_SBC_ENGINE:-opensips}"
 NODE_UUID="${MNSCLOUD_SBC_NODE_UUID:-}"
@@ -285,6 +287,13 @@ ensure_opensips_dbtext_permissions() {
   done
 }
 
+ensure_opensips_runtime_dirs() {
+  local group
+  group="$(opensips_group)"
+  run "install -d -o root -g '${group}' -m 0770 '${MI_FIFO_DIR}'"
+  write_file "/etc/tmpfiles.d/mnscloud-opensips-sbc.conf" "d ${MI_FIFO_DIR} 0770 root ${group} -"
+}
+
 configure_opensips_defaults() {
   local defaults_file="/etc/default/opensips"
   if [[ "$DRY_RUN" == true ]]; then
@@ -355,8 +364,8 @@ modparam(\"uac_registrant\", \"db_url\", \"text://${DBTEXT_DIR}\")
 modparam(\"uac_registrant\", \"table_name\", \"registrant\")
 modparam(\"uac_registrant\", \"timer_interval\", 30)
 modparam(\"uac_registrant\", \"failure_retry_interval\", 60)
-modparam(\"mi_fifo\", \"fifo_name\", \"/tmp/opensips_sbc_fifo\")
-modparam(\"mi_fifo\", \"fifo_mode\", 0600)"
+modparam(\"mi_fifo\", \"fifo_name\", \"${MI_FIFO_FILE}\")
+modparam(\"mi_fifo\", \"fifo_mode\", 0660)"
   else
     warn "OpenSIPS db_text/uac/uac_auth/uac_registrant/mi_fifo modules not found; active REGISTER peers will stay disabled until the modules are installed"
   fi
@@ -503,6 +512,7 @@ main() {
   bootstrap_node_via_api || true
   sync_runtime_config || warn "SBC runtime config sync failed; installer will continue with the last local runtime state if present"
   ensure_opensips_dbtext_permissions
+  ensure_opensips_runtime_dirs
   load_media_socket_file
   write_opensips_config
   enable_service
