@@ -89,7 +89,10 @@ The installer creates or reuses `/etc/mnscloud/sbc/node.uuid`, `/etc/mnscloud/sb
 `/etc/mnscloud/sbc/api.base`, validates bootstrap against the API when possible, syncs runtime
 configuration into `/etc/mnscloud/sbc/runtime/config.json`, generates the local OpenSIPS `db_text`
 registrant table for active REGISTER peers, writes the OpenSIPS configuration, and keeps the
-original `/etc/opensips/opensips.cfg` as `/etc/opensips/opensips.cfg.bkp`.
+original `/etc/opensips/opensips.cfg` as `/etc/opensips/opensips.cfg.bkp`. It also configures
+OpenSIPS memory defaults in `/etc/default/opensips` and enables
+`mnscloud-opensips-sbc-sync.timer` so runtime changes made in the control plane are pulled by the
+server automatically.
 
 API-generated commands may pass `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`, and
 `MNSCLOUD_SBC_API_TOKEN`; when present, the installer persists those values before bootstrapping.
@@ -144,6 +147,11 @@ It updates:
 
 Files are owned by `root:root` and written as `0640`. Runtime secrets are consumed only by the SBC
 host and are not embedded in public documentation or frontend code.
+
+For installed servers, `mnscloud-opensips-sbc-sync.timer` runs
+`scripts/sync-and-reload-opensips-sbc.sh` every minute. The wrapper compares the runtime snapshot
+before and after sync and restarts `opensips.service` only when generated runtime files changed,
+which makes new REGISTER peers become active without reinstalling the SBC.
 
 ## Rollback
 

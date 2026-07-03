@@ -285,6 +285,33 @@ ensure_opensips_dbtext_permissions() {
   done
 }
 
+configure_opensips_defaults() {
+  local defaults_file="/etc/default/opensips"
+  if [[ "$DRY_RUN" == true ]]; then
+    log DRY "set OpenSIPS shared/private memory defaults in ${defaults_file}"
+    return 0
+  fi
+
+  backup_once "${defaults_file}"
+  [[ -f "${defaults_file}" ]] || write_file "${defaults_file}" "# MNSCloud OpenSIPS runtime defaults"
+
+  if grep -q '^S_MEMORY=' "${defaults_file}"; then
+    run "sed -i 's/^S_MEMORY=.*/S_MEMORY=512/' '${defaults_file}'"
+  else
+    printf '\nS_MEMORY=512\n' >> "${defaults_file}"
+  fi
+
+  if grep -q '^P_MEMORY=' "${defaults_file}"; then
+    run "sed -i 's/^P_MEMORY=.*/P_MEMORY=32/' '${defaults_file}'"
+  else
+    printf 'P_MEMORY=32\n' >> "${defaults_file}"
+  fi
+
+  run "chown root:root '${defaults_file}'"
+  run "chmod 0644 '${defaults_file}'"
+  ok "OpenSIPS memory defaults configured: S_MEMORY=512 P_MEMORY=32"
+}
+
 opensips_module_path() {
   local arch
   if command -v dpkg-architecture >/dev/null 2>&1; then
@@ -417,6 +444,38 @@ enable_service() {
   run "systemctl is-active opensips"
 }
 
+install_runtime_sync_units() {
+  local sync_script="${SCRIPT_DIR}/sync-and-reload-opensips-sbc.sh"
+  [[ -x "${sync_script}" ]] || run "chmod +x '${sync_script}'"
+
+  write_file "/etc/systemd/system/mnscloud-opensips-sbc-sync.service" "[Unit]
+Description=MNSCloud OpenSIPS SBC runtime sync
+After=network-online.target opensips.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=${sync_script}
+"
+
+  write_file "/etc/systemd/system/mnscloud-opensips-sbc-sync.timer" "[Unit]
+Description=Run MNSCloud OpenSIPS SBC runtime sync
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+"
+
+  run "systemctl daemon-reload"
+  run "systemctl enable --now mnscloud-opensips-sbc-sync.timer"
+  ok "SBC runtime sync timer enabled"
+}
+
 sync_runtime_config() {
   local sync_script="${SCRIPT_DIR}/sync-opensips-sbc-runtime.sh"
   [[ -x "${sync_script}" ]] || run "chmod +x '${sync_script}'"
@@ -440,12 +499,14 @@ main() {
   ensure_node_uuid_file
   ensure_api_token_file
   case "$(detect_opensips_os)" in debian) install_packages_debian ;; rocky) install_packages_rocky ;; esac
+  configure_opensips_defaults
   bootstrap_node_via_api || true
   sync_runtime_config || warn "SBC runtime config sync failed; installer will continue with the last local runtime state if present"
   ensure_opensips_dbtext_permissions
   load_media_socket_file
   write_opensips_config
   enable_service
+  install_runtime_sync_units
   ok "OpenSIPS SBC installed. Node UUID: ${NODE_UUID}"
 }
 
