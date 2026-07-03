@@ -134,9 +134,9 @@ EOF
       elif (($peer.authUsername // "") | clean) != "" and (($peer.fromDomain // $peer.registrarHost // "") | clean) != "" then "sip:" + ($peer.authUsername | clean) + "@" + (($peer.fromDomain // $peer.registrarHost) | clean)
       else ""
       end;
-    def binding($peer):
+    def binding($root; $peer):
       ($peer.contactUser // $peer.authUsername // "sbc") as $user
-      | ($peer.contactDomain // .server.publicIP // .server.privateIP // .server.hostname // "") as $domain
+      | ($peer.contactDomain // $root.server.publicIP // $root.server.privateIP // $root.server.hostname // "") as $domain
       | if ($domain | clean) == "" then "" else "sip:" + ($user | clean) + "@" + ($domain | clean) end;
     . as $root
     | [ $root.peers[]?
@@ -149,7 +149,7 @@ EOF
           thirdParty: (($peer.fromDomain // "") | if clean == "" then "" else "sip:" + clean end),
           username: ($peer.authUsername // ""),
           password: ($peer.authPassword // ""),
-          binding: binding($peer),
+          binding: binding($root; $peer),
           params: "",
           expiry: ($peer.registerExpires // 3600),
           socket: "",
