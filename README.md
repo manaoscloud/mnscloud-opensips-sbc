@@ -108,6 +108,7 @@ configuration. Without an assigned media relay, OpenSIPS runs as SIP signaling/S
 sudo bash scripts/validate-opensips-sbc.sh
 sudo opensips -C -f /etc/opensips/opensips.cfg
 sudo systemctl status opensips
+sudo bash scripts/opensips-sbc-mi.sh reg_list
 ```
 
 The validator checks shell syntax and, when OpenSIPS is installed, validates the active OpenSIPS
@@ -153,6 +154,14 @@ For installed servers, `mnscloud-opensips-sbc-sync.timer` runs
 registrant table before and after sync and calls the official OpenSIPS MI `reg_reload` command over
 the local FIFO when REGISTER peers changed. `opensips.service` is restarted only for static runtime
 changes that cannot be applied by MI, such as a changed media socket.
+
+OpenSIPS MI commands should be executed through the repository helper so the reply FIFO is created
+with the same ownership and permissions as the installed service:
+
+```bash
+sudo bash scripts/opensips-sbc-mi.sh reg_list
+sudo bash scripts/opensips-sbc-mi.sh reg_reload
+```
 
 ## Rollback
 
