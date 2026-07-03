@@ -12,11 +12,15 @@ TIMEOUT_SECONDS="${MNSCLOUD_SBC_MI_TIMEOUT:-8}"
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/opensips-sbc-mi.sh <mi-method>
+Usage: scripts/opensips-sbc-mi.sh <mi-method> [name=value ...]
 
 Examples:
   sudo bash scripts/opensips-sbc-mi.sh reg_list
   sudo bash scripts/opensips-sbc-mi.sh reg_reload
+  sudo bash scripts/opensips-sbc-mi.sh reg_force_register \
+    aor=sip:user@example.com \
+    contact=sip:user@203.0.113.10 \
+    registrar=sip:registrar.example.com:5060\;transport=udp
 USAGE
 }
 
@@ -41,11 +45,34 @@ main() {
     exit 1
   }
 
-  local request_id reply_name reply_fifo reply_body reader_pid response
+  command -v jq >/dev/null 2>&1 || {
+    err "jq is required to build OpenSIPS MI JSON-RPC payloads"
+    exit 1
+  }
+
+  local request_id reply_name reply_fifo reply_body reader_pid response payload params_json arg key value
   request_id="mnscloud-$(date +%s)-$$"
   reply_name="mnscloud_sbc_reply_$$"
   reply_fifo="${MI_FIFO_DIR}/${reply_name}"
   reply_body="$(mktemp)"
+  params_json="{}"
+
+  shift || true
+  for arg in "$@"; do
+    if [[ "${arg}" != *=* ]]; then
+      err "Invalid MI parameter '${arg}'. Use name=value."
+      exit 2
+    fi
+    key="${arg%%=*}"
+    value="${arg#*=}"
+    params_json="$(jq --arg key "${key}" --arg value "${value}" '. + {($key): $value}' <<<"${params_json}")"
+  done
+
+  if [[ "${params_json}" == "{}" ]]; then
+    payload="$(jq -nc --arg method "${METHOD}" --arg id "${request_id}" '{jsonrpc:"2.0", method:$method, id:$id}')"
+  else
+    payload="$(jq -nc --arg method "${METHOD}" --arg id "${request_id}" --argjson params "${params_json}" '{jsonrpc:"2.0", method:$method, params:$params, id:$id}')"
+  fi
 
   rm -f "${reply_fifo}"
   mkfifo "${reply_fifo}"
@@ -55,7 +82,7 @@ main() {
   timeout "${TIMEOUT_SECONDS}s" cat "${reply_fifo}" > "${reply_body}" &
   reader_pid="$!"
 
-  printf ':%s:{"jsonrpc":"2.0","method":"%s","id":"%s"}\n' "${reply_name}" "${METHOD}" "${request_id}" > "${MI_FIFO_FILE}"
+  printf ':%s:%s\n' "${reply_name}" "${payload}" > "${MI_FIFO_FILE}"
   if ! wait "${reader_pid}"; then
     rm -f "${reply_fifo}" "${reply_body}"
     err "OpenSIPS MI ${METHOD} did not reply within ${TIMEOUT_SECONDS}s"

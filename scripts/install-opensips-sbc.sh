@@ -452,6 +452,11 @@ enable_service() {
   run "systemctl enable opensips"
   run "systemctl restart opensips"
   run "systemctl is-active opensips"
+  if [[ "$DRY_RUN" == true ]]; then
+    log DRY "force active OpenSIPS UAC registrations"
+  else
+    MNSCLOUD_SBC_FORCE_REGISTER=true bash "${SCRIPT_DIR}/sync-and-reload-opensips-sbc.sh" || warn "SBC runtime reload/REGISTER force failed; inspect OpenSIPS MI and registrant state"
+  fi
 }
 
 install_runtime_sync_units() {

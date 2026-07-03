@@ -161,12 +161,20 @@ with the same ownership and permissions as the installed service:
 ```bash
 sudo bash scripts/opensips-sbc-mi.sh reg_list
 sudo bash scripts/opensips-sbc-mi.sh reg_reload
+sudo bash scripts/opensips-sbc-mi.sh reg_force_register \
+  aor=sip:user@example.com \
+  contact=sip:user@203.0.113.10 \
+  registrar=sip:registrar.example.com:5060\;transport=udp
 ```
 
 The installed `mi_fifo` configuration keeps the command FIFO at
 `/run/opensips/mnscloud_sbc_fifo` and the reply directory at `/run/opensips/`. Keep the trailing
 slash in the `reply_dir` value; OpenSIPS builds the reply FIFO path from that directory and the
 reply FIFO name sent in the MI command.
+
+During install/update, the installer asks OpenSIPS to force active REGISTER peers once after the
+service restart. The periodic sync does not force re-registration when the registrant table is
+unchanged, avoiding unnecessary REGISTER bursts.
 
 ## Rollback
 

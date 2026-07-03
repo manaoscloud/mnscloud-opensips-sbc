@@ -12,6 +12,7 @@ MEDIA_SOCKET_FILE="/etc/mnscloud/sbc/media.socket"
 OPENSIPS_CFG="/etc/opensips/opensips.cfg"
 MI_FIFO_DIR="/run/opensips"
 MI_FIFO_FILE="${MI_FIFO_DIR}/mnscloud_sbc_fifo"
+FORCE_REGISTER="${MNSCLOUD_SBC_FORCE_REGISTER:-false}"
 
 file_checksum() {
   local file="$1"
@@ -31,15 +32,22 @@ opensips_group() {
 }
 
 run_mi() {
-  local method="$1" request_id reply_name reply_fifo reply_body response
+  local method="$1" params_json="${2:-{}}" request_id reply_name reply_fifo reply_body response payload
   shift || true
   [[ -p "${MI_FIFO_FILE}" ]] ||
     { err "OpenSIPS MI FIFO not found: ${MI_FIFO_FILE}"; return 1; }
+  command -v jq >/dev/null 2>&1 ||
+    { err "jq is required to build OpenSIPS MI JSON-RPC payloads"; return 1; }
 
   request_id="mnscloud-$(date +%s)-$$"
   reply_name="mnscloud_sbc_reply_$$"
   reply_fifo="${MI_FIFO_DIR}/${reply_name}"
   reply_body="$(mktemp)"
+  if [[ "${params_json}" == "{}" ]]; then
+    payload="$(jq -nc --arg method "${method}" --arg id "${request_id}" '{jsonrpc:"2.0", method:$method, id:$id}')"
+  else
+    payload="$(jq -nc --arg method "${method}" --arg id "${request_id}" --argjson params "${params_json}" '{jsonrpc:"2.0", method:$method, params:$params, id:$id}')"
+  fi
 
   rm -f "${reply_fifo}"
   mkfifo "${reply_fifo}"
@@ -48,7 +56,7 @@ run_mi() {
 
   timeout 8s cat "${reply_fifo}" > "${reply_body}" &
   local reader_pid="$!"
-  printf ':%s:{"jsonrpc":"2.0","method":"%s","id":"%s"}\n' "${reply_name}" "${method}" "${request_id}" > "${MI_FIFO_FILE}"
+  printf ':%s:%s\n' "${reply_name}" "${payload}" > "${MI_FIFO_FILE}"
   wait "${reader_pid}" || {
     rm -f "${reply_fifo}" "${reply_body}"
     err "OpenSIPS MI ${method} did not reply"
@@ -62,14 +70,61 @@ run_mi() {
     { err "OpenSIPS MI ${method} returned an error"; return 1; }
 }
 
+force_active_registrants() {
+  local config_file="${RUNTIME_DIR}/config.json"
+  [[ -r "${config_file}" ]] || {
+    warn "SBC runtime config not found; cannot force REGISTER"
+    return 0
+  }
+
+  jq -rc '
+    def clean: if . == null then "" else tostring | gsub("^\\s+|\\s+$"; "") end;
+    def sipuri:
+      (clean) as $v
+      | if $v == "" then ""
+        elif ($v | test("^sips?:")) then $v
+        else "sip:" + $v
+        end;
+    def siphost($host; $port; $transport):
+      ($host | clean) as $h
+      | ($port // 5060) as $p
+      | ($transport // "udp" | clean | ascii_downcase) as $t
+      | if $h == "" then "" else "sip:" + $h + ":" + ($p|tostring) + ";transport=" + $t end;
+    def aor($peer):
+      if (($peer.aor // "") | clean) != "" then ($peer.aor | sipuri)
+      elif (($peer.authUsername // "") | clean) != "" and (($peer.fromDomain // $peer.registrarHost // "") | clean) != "" then "sip:" + ($peer.authUsername | clean) + "@" + (($peer.fromDomain // $peer.registrarHost) | clean)
+      else ""
+      end;
+    def binding($root; $peer):
+      ($peer.contactUser // $peer.authUsername // "sbc") as $user
+      | ($peer.contactDomain // $root.server.publicIP // $root.server.privateIP // $root.server.hostname // "") as $domain
+      | if ($domain | clean) == "" then "" else "sip:" + ($user | clean) + "@" + ($domain | clean) end;
+    . as $root
+    | $root.peers[]?
+    | select((.authMode == "register" or .registerEnabled == 1) and .authUsername and .authPassword)
+    | {
+        aor: aor(.),
+        contact: binding($root; .),
+        registrar: siphost(.registrarHost; (.registrarPort // 5060); (.registrarTransport // "udp"))
+      }
+    | select(.aor != "" and .contact != "" and .registrar != "")
+  ' "${config_file}" | while IFS= read -r record; do
+    run_mi reg_force_register "${record}" || return 1
+  done
+}
+
 reload_registrants_if_changed() {
   local before="$1" after="$2"
   if [[ "${before}" == "${after}" ]]; then
+    if [[ "${FORCE_REGISTER}" == "true" ]]; then
+      force_active_registrants
+    fi
     ok "SBC registrants unchanged; OpenSIPS MI reload not required"
     return 0
   fi
 
   run_mi reg_reload
+  force_active_registrants
   ok "SBC registrants changed; OpenSIPS uac_registrant reloaded via MI"
 }
 
