@@ -77,7 +77,7 @@ force_active_registrants() {
     return 0
   }
 
-  jq -rc '
+  jq -r '
     def clean: if . == null then "" else tostring | gsub("^\\s+|\\s+$"; "") end;
     def sipuri:
       (clean) as $v
@@ -102,19 +102,14 @@ force_active_registrants() {
     . as $root
     | $root.peers[]?
     | select((.authMode == "register" or .registerEnabled == 1) and .authUsername and .authPassword)
-    | {
-        aor: aor(.),
-        contact: binding($root; .),
-        registrar: siphost(.registrarHost; (.registrarPort // 5060); (.registrarTransport // "udp"))
-      }
-    | select(.aor != "" and .contact != "" and .registrar != "")
-  ' "${config_file}" | while IFS= read -r record; do
-    [[ -n "${record//[[:space:]]/}" ]] || continue
-    if ! printf '%s' "${record}" | jq -e 'type == "object" and (.aor | length > 0) and (.contact | length > 0) and (.registrar | length > 0)' >/dev/null; then
-      warn "Skipping invalid OpenSIPS registrant force payload: ${record}"
-      continue
-    fi
-    run_mi reg_force_register "${record}" || return 1
+    | [aor(.), binding($root; .), siphost(.registrarHost; (.registrarPort // 5060); (.registrarTransport // "udp"))]
+    | select(.[0] != "" and .[1] != "" and .[2] != "")
+    | @tsv
+  ' "${config_file}" | while IFS=$'\t' read -r aor contact registrar; do
+    [[ -n "${aor}" && -n "${contact}" && -n "${registrar}" ]] || continue
+    local payload
+    payload="$(jq -nc --arg aor "${aor}" --arg contact "${contact}" --arg registrar "${registrar}" '{aor:$aor, contact:$contact, registrar:$registrar}')"
+    run_mi reg_force_register "${payload}" || return 1
   done
 }
 
