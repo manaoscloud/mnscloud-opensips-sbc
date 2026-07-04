@@ -161,8 +161,9 @@ host and are not embedded in public documentation or frontend code.
 For installed servers, `mnscloud-opensips-sbc-sync.timer` runs
 `scripts/sync-and-reload-opensips-sbc.sh` every 10 minutes as a fallback reconciler. Normal
 configuration changes should arrive immediately through the MNSCloud Agent `voip.sbc.runtime` job.
-The wrapper compares the generated registrant table before and after sync and calls the official
-OpenSIPS MI `reg_reload` command over the local FIFO when REGISTER peers changed.
+The wrapper compares the generated registrant table before and after sync. Removed REGISTER peers
+are first disabled with the official OpenSIPS MI `reg_disable` command so the remote registrar
+receives an unREGISTER, then changed registrations are applied with `reg_reload`.
 `opensips.service` is restarted only for static runtime changes that cannot be applied by MI, such
 as a changed media socket.
 
@@ -173,6 +174,10 @@ with the same ownership and permissions as the installed service:
 sudo bash scripts/opensips-sbc-mi.sh reg_list
 sudo bash scripts/opensips-sbc-mi.sh reg_reload
 sudo bash scripts/opensips-sbc-mi.sh reg_force_register \
+  aor=sip:user@example.com \
+  contact=sip:user@203.0.113.10 \
+  registrar=sip:registrar.example.com:5060\;transport=udp
+sudo bash scripts/opensips-sbc-mi.sh reg_disable \
   aor=sip:user@example.com \
   contact=sip:user@203.0.113.10 \
   registrar=sip:registrar.example.com:5060\;transport=udp

@@ -23,6 +23,62 @@ file_checksum() {
   fi
 }
 
+removed_registrants() {
+  local before_file="$1" after_file="$2"
+  python3 - "$before_file" "$after_file" <<'PY'
+import sys
+
+def split_dbtext(line: str) -> list[str]:
+    fields = []
+    current = []
+    escaped = False
+    for char in line.rstrip("\n"):
+        if escaped:
+            if char == "n":
+                current.append("\n")
+            elif char == "r":
+                current.append("\r")
+            elif char == "t":
+                current.append("\t")
+            else:
+                current.append(char)
+            escaped = False
+        elif char == "\\":
+            escaped = True
+        elif char == ":":
+            fields.append("".join(current))
+            current = []
+        else:
+            current.append(char)
+    fields.append("".join(current))
+    return fields
+
+def keys(path: str) -> set[tuple[str, str, str]]:
+    values = set()
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            for idx, line in enumerate(handle):
+                if idx == 0 or not line.strip():
+                    continue
+                fields = split_dbtext(line)
+                if len(fields) < 8:
+                    continue
+                registrar = fields[1].strip()
+                aor = fields[3].strip()
+                contact = fields[7].strip()
+                if aor and contact and registrar:
+                    values.add((aor, contact, registrar))
+    except FileNotFoundError:
+        pass
+    return values
+
+before = keys(sys.argv[1])
+after = keys(sys.argv[2])
+for aor, contact, registrar in sorted(before - after):
+    print(f"{aor}\t{contact}\t{registrar}")
+PY
+}
+
 opensips_group() {
   if getent group opensips >/dev/null 2>&1; then
     printf "opensips"
@@ -123,8 +179,24 @@ force_active_registrants() {
   done
 }
 
+disable_removed_registrants() {
+  local before_file="$1" after_file="$2"
+  [[ -r "${before_file}" ]] || return 0
+  [[ -r "${after_file}" ]] || return 0
+
+  removed_registrants "${before_file}" "${after_file}" |
+    while IFS=$'\t' read -r aor contact registrar; do
+      [[ -n "${aor}" && -n "${contact}" && -n "${registrar}" ]] || continue
+      if run_mi reg_disable "aor=${aor}" "contact=${contact}" "registrar=${registrar}"; then
+        info "OpenSIPS disabled removed registrant: ${aor} ${contact} ${registrar}"
+      else
+        warn "OpenSIPS could not disable removed registrant before reload: ${aor} ${contact} ${registrar}"
+      fi
+    done
+}
+
 reload_registrants_if_changed() {
-  local before="$1" after="$2"
+  local before="$1" after="$2" before_file="$3" after_file="$4"
   if [[ "${before}" == "${after}" ]]; then
     if [[ "${FORCE_REGISTER}" == "true" ]]; then
       force_active_registrants
@@ -133,6 +205,7 @@ reload_registrants_if_changed() {
     return 0
   fi
 
+  disable_removed_registrants "${before_file}" "${after_file}"
   run_mi reg_reload
   force_active_registrants
   ok "SBC registrants changed; OpenSIPS uac_registrant reloaded via MI"
@@ -163,13 +236,18 @@ main() {
     return 0
   fi
 
-  local registrant_before registrant_after media_before media_after
+  local registrant_before registrant_after media_before media_after registrant_before_file
+  registrant_before_file="$(mktemp)"
+  trap 'rm -f "${registrant_before_file}"' EXIT
   registrant_before="$(file_checksum "${DBTEXT_DIR}/registrant")"
+  if [[ -r "${DBTEXT_DIR}/registrant" ]]; then
+    cp "${DBTEXT_DIR}/registrant" "${registrant_before_file}"
+  fi
   media_before="$(file_checksum "${MEDIA_SOCKET_FILE}")"
   bash "${SCRIPT_DIR}/sync-opensips-sbc-runtime.sh"
   registrant_after="$(file_checksum "${DBTEXT_DIR}/registrant")"
   media_after="$(file_checksum "${MEDIA_SOCKET_FILE}")"
-  reload_registrants_if_changed "${registrant_before}" "${registrant_after}"
+  reload_registrants_if_changed "${registrant_before}" "${registrant_after}" "${registrant_before_file}" "${DBTEXT_DIR}/registrant"
   restart_when_static_runtime_changed "${media_before}" "${media_after}"
 }
 

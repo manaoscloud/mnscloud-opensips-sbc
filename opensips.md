@@ -96,6 +96,9 @@ O instalador:
   `REGISTER` ativo para evitar configuração quebrada.
 - expõe MI FIFO em `/run/opensips/mnscloud_sbc_fifo`, evitando `/tmp` por causa das proteções de
   FIFO em Linux moderno.
+- antes de recarregar registros SIP, compara a tabela `registrant` anterior com a nova e chama
+  `reg_disable` para peers `register` removidos, enviando unREGISTER para o registrar remoto
+  quando o módulo oficial conseguir fazê-lo.
 - recarrega registros SIP com o MI `reg_reload` pelo FIFO local quando o control plane altera
   peers `register`, mantendo o processo OpenSIPS ativo.
 - atualiza/reinicia o `mnscloud-agent` no fim da instalação para republicar a capacidade
