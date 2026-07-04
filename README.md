@@ -189,8 +189,8 @@ slash in the `reply_dir` value; OpenSIPS builds the reply FIFO path from that di
 reply FIFO name sent in the MI command.
 
 During install/update, the installer asks OpenSIPS to force active REGISTER peers once after the
-service restart. The periodic sync does not force re-registration when the registrant table is
-unchanged, avoiding unnecessary REGISTER bursts.
+service restart. After bootstrap, runtime changes are reconciled only by the MNSCloud Agent
+`voip.sbc.runtime` job.
 
 ## Rollback
 
