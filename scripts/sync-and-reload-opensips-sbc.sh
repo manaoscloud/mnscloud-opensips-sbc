@@ -238,7 +238,7 @@ main() {
 
   local registrant_before registrant_after media_before media_after registrant_before_file
   registrant_before_file="$(mktemp)"
-  trap 'rm -f "${registrant_before_file}"' EXIT
+  trap "rm -f '${registrant_before_file}'" EXIT
   registrant_before="$(file_checksum "${DBTEXT_DIR}/registrant")"
   if [[ -r "${DBTEXT_DIR}/registrant" ]]; then
     cp "${DBTEXT_DIR}/registrant" "${registrant_before_file}"
