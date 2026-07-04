@@ -13,6 +13,11 @@ MEDIA_SOCKET_FILE="/etc/mnscloud/sbc/media.socket"
 DBTEXT_DIR="/etc/mnscloud/sbc/dbtext"
 MI_FIFO_DIR="/run/opensips"
 MI_FIFO_FILE="${MI_FIFO_DIR}/mnscloud_sbc_fifo"
+AGENT_CONFIG_FILE="/etc/mnscloud/agent/agent.conf"
+AGENT_UUID_FILE="/var/lib/mnscloud/agent/agent.uuid"
+AGENT_TOKEN_FILE="/var/lib/mnscloud/agent/agent.token"
+AGENT_RUNTIME_MAIN="/opt/mnscloud/agent/main.ts"
+AGENT_REPO_INSTALLER="/opt/mnscloud/mnscloud-agent/scripts/install-agent.sh"
 DEFAULT_API_BASE="${MNSCLOUD_API_BASE:-https://api.example.com}"
 SBC_ENGINE="${MNSCLOUD_SBC_ENGINE:-opensips}"
 NODE_UUID="${MNSCLOUD_SBC_NODE_UUID:-}"
@@ -32,6 +37,51 @@ normalize_url() {
 
 validate_api_base() {
   [[ "$1" =~ ^https?://[^[:space:]/]+(:[0-9]+)?(/[^[:space:]]*)?$ ]]
+}
+
+require_mnscloud_agent() {
+  if [[ "$DRY_RUN" == true ]]; then
+    log DRY "validate mnscloud-agent is installed, enrolled, active, and supports voip.sbc.runtime"
+    return 0
+  fi
+
+  command -v systemctl >/dev/null 2>&1 ||
+    { err "systemctl is required to validate mnscloud-agent before installing the SBC."; return 1; }
+
+  systemctl is-active --quiet mnscloud-agent ||
+    { err "mnscloud-agent must be installed, enrolled, and active before installing the OpenSIPS SBC."; return 1; }
+
+  [[ -s "${AGENT_CONFIG_FILE}" ]] ||
+    { err "mnscloud-agent config not found at ${AGENT_CONFIG_FILE}. Install/enroll the Agent first."; return 1; }
+  [[ -s "${AGENT_UUID_FILE}" ]] ||
+    { err "mnscloud-agent UUID not found at ${AGENT_UUID_FILE}. Enroll the Agent first."; return 1; }
+  [[ -s "${AGENT_TOKEN_FILE}" ]] ||
+    { err "mnscloud-agent runtime token not found at ${AGENT_TOKEN_FILE}. Enroll the Agent first."; return 1; }
+  [[ -s "${AGENT_RUNTIME_MAIN}" ]] ||
+    { err "mnscloud-agent runtime not found at ${AGENT_RUNTIME_MAIN}. Reinstall/update the Agent first."; return 1; }
+
+  grep -q 'voip\.sbc\.runtime' "${AGENT_RUNTIME_MAIN}" ||
+    { err "Installed mnscloud-agent does not support voip.sbc.runtime jobs. Update/reinstall the Agent before installing the SBC."; return 1; }
+
+  ok "mnscloud-agent prerequisite validated for OpenSIPS SBC runtime jobs."
+}
+
+refresh_agent_capabilities() {
+  local install_label
+  install_label="$(hostname -f 2>/dev/null || hostname 2>/dev/null || printf 'mnscloud-agent')"
+  if [[ "$DRY_RUN" == true ]]; then
+    log DRY "refresh mnscloud-agent capabilities so it publishes voip.sbc.manage"
+    return 0
+  fi
+
+  if [[ -x "${AGENT_REPO_INSTALLER}" ]]; then
+    info "Refreshing mnscloud-agent capabilities after SBC runtime install."
+    bash "${AGENT_REPO_INSTALLER}" --api-base "${API_BASE}" --install-label "${install_label}"
+    return 0
+  fi
+
+  warn "mnscloud-agent source repo not found at ${AGENT_REPO_INSTALLER}; restarting service so runtime capability detection can refresh."
+  run "systemctl restart mnscloud-agent"
 }
 
 prompt_api_base() {
@@ -512,6 +562,7 @@ main() {
   local app_security_script="${MNSCLOUD_MONOREPO_ROOT:-${PROJECT_ROOT}}/scripts/application-security.sh"
   [[ -f "${app_security_script}" ]] && run "bash '${app_security_script}'"
   ensure_local_hostname_hosts
+  require_mnscloud_agent
   ensure_api_base_file
   ensure_node_uuid_file
   ensure_api_token_file
@@ -525,6 +576,7 @@ main() {
   write_opensips_config
   enable_service
   install_runtime_sync_units
+  refresh_agent_capabilities
   ok "OpenSIPS SBC installed. Node UUID: ${NODE_UUID}"
 }
 

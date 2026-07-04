@@ -46,6 +46,9 @@ is installed or updated.
 - Debian 12 or Rocky Linux 8/9.
 - Root privileges for package installation, `/etc/opensips`, systemd, and `/etc/mnscloud`.
 - Network reachability from the OpenSIPS host to the MNSCloud API base URL.
+- `mnscloud-agent` already installed, enrolled, active, and updated with support for
+  `voip.sbc.runtime` jobs. The SBC installer fails closed when the Agent is missing or inactive,
+  because realtime runtime sync is required for a fully functional SBC.
 - A master `VoipSbcServer` record for this runtime, with engine `opensips` and a matching
   `VbsNodeUUID`, or an operational bootstrap flow that can bind the local node UUID.
 - Optional: an active `RealtimeMediaServer` selected on the `VoipSbcServer` record when this SBC
@@ -85,14 +88,17 @@ For a no-change preview:
 sudo bash scripts/install-opensips-sbc.sh --dry-run
 ```
 
-The installer creates or reuses `/etc/mnscloud/sbc/node.uuid`, `/etc/mnscloud/sbc/api.token`, and
-`/etc/mnscloud/sbc/api.base`, validates bootstrap against the API when possible, syncs runtime
+The installer first validates that `mnscloud-agent` is installed, enrolled, active, and capable of
+handling `voip.sbc.runtime` jobs. It then creates or reuses `/etc/mnscloud/sbc/node.uuid`,
+`/etc/mnscloud/sbc/api.token`, and `/etc/mnscloud/sbc/api.base`, validates bootstrap against the
+API when possible, syncs runtime
 configuration into `/etc/mnscloud/sbc/runtime/config.json`, generates the local OpenSIPS `db_text`
 registrant table for active REGISTER peers, writes the OpenSIPS configuration, and keeps the
 original `/etc/opensips/opensips.cfg` as `/etc/opensips/opensips.cfg.bkp`. It also configures
 OpenSIPS memory defaults in `/etc/default/opensips` and enables
 `mnscloud-opensips-sbc-sync.timer` so runtime changes made in the control plane are pulled by the
-server automatically.
+server automatically. At the end of a successful install, it refreshes or restarts the Agent so the
+host publishes the effective `voip.sbc.manage` capability after the local SBC sync command exists.
 
 API-generated commands may pass `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`, and
 `MNSCLOUD_SBC_API_TOKEN`; when present, the installer persists those values before bootstrapping.
