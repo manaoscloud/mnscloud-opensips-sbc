@@ -96,10 +96,11 @@ API when possible, syncs runtime
 configuration into `/etc/mnscloud/sbc/runtime/config.json`, generates the local OpenSIPS `db_text`
 registrant table for active REGISTER peers, writes the OpenSIPS configuration, and keeps the
 original `/etc/opensips/opensips.cfg` as `/etc/opensips/opensips.cfg.bkp`. It also configures
-OpenSIPS memory defaults in `/etc/default/opensips` and enables
-`mnscloud-opensips-sbc-sync.timer` so runtime changes made in the control plane are pulled by the
-server automatically. At the end of a successful install, it refreshes or restarts the Agent so the
-host publishes the effective `voip.sbc.manage` capability after the local SBC sync command exists.
+OpenSIPS memory defaults in `/etc/default/opensips` and removes any legacy
+`mnscloud-opensips-sbc-sync.timer`/service units. Runtime changes must be delivered by the
+MNSCloud Agent `voip.sbc.runtime` job, with no periodic fallback reconciler. At the end of a
+successful install, it refreshes or restarts the Agent so the host publishes the effective
+`voip.sbc.manage` capability after the local SBC sync command exists.
 
 API-generated commands may pass `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`, and
 `MNSCLOUD_SBC_API_TOKEN`; when present, the installer persists those values before bootstrapping.
@@ -158,14 +159,13 @@ It updates:
 Files are owned by `root:root` and written as `0640`. Runtime secrets are consumed only by the SBC
 host and are not embedded in public documentation or frontend code.
 
-For installed servers, `mnscloud-opensips-sbc-sync.timer` runs
-`scripts/sync-and-reload-opensips-sbc.sh` every 10 minutes as a fallback reconciler. Normal
-configuration changes should arrive immediately through the MNSCloud Agent `voip.sbc.runtime` job.
-The wrapper compares the generated registrant table before and after sync. Removed REGISTER peers
-are first disabled with the official OpenSIPS MI `reg_disable` command so the remote registrar
-receives an unREGISTER, then changed registrations are applied with `reg_reload`.
-`opensips.service` is restarted only for static runtime changes that cannot be applied by MI, such
-as a changed media socket.
+For installed servers, configuration changes arrive through the MNSCloud Agent
+`voip.sbc.runtime` job. The Agent runs `scripts/sync-and-reload-opensips-sbc.sh`, which compares the
+generated registrant table before and after sync. Removed REGISTER peers are first disabled with
+the official OpenSIPS MI `reg_disable` command so the remote registrar receives an unREGISTER, then
+changed registrations are applied with `reg_reload`. `opensips.service` is restarted only for
+static runtime changes that cannot be applied by MI, such as a changed media socket. Manual
+execution of the sync script is reserved for troubleshooting or controlled maintenance.
 
 OpenSIPS MI commands should be executed through the repository helper so the reply FIFO is created
 with the same ownership and permissions as the installed service:

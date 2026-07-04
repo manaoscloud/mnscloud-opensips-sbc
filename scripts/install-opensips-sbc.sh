@@ -492,36 +492,16 @@ enable_service() {
   fi
 }
 
-install_runtime_sync_units() {
+remove_runtime_sync_units() {
   local sync_script="${SCRIPT_DIR}/sync-and-reload-opensips-sbc.sh"
   [[ -x "${sync_script}" ]] || run "chmod +x '${sync_script}'"
 
-  write_file "/etc/systemd/system/mnscloud-opensips-sbc-sync.service" "[Unit]
-Description=MNSCloud OpenSIPS SBC runtime sync
-After=network-online.target opensips.service
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=${sync_script}
-"
-
-  write_file "/etc/systemd/system/mnscloud-opensips-sbc-sync.timer" "[Unit]
-Description=Run MNSCloud OpenSIPS SBC runtime sync
-
-[Timer]
-OnBootSec=30s
-OnUnitActiveSec=10min
-AccuracySec=30s
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-"
-
+  run "systemctl disable --now mnscloud-opensips-sbc-sync.timer >/dev/null 2>&1 || true"
+  run "systemctl disable --now mnscloud-opensips-sbc-sync.service >/dev/null 2>&1 || true"
+  run "rm -f /etc/systemd/system/mnscloud-opensips-sbc-sync.timer /etc/systemd/system/mnscloud-opensips-sbc-sync.service"
   run "systemctl daemon-reload"
-  run "systemctl enable --now mnscloud-opensips-sbc-sync.timer"
-  ok "SBC runtime sync timer enabled"
+  run "systemctl reset-failed mnscloud-opensips-sbc-sync.timer mnscloud-opensips-sbc-sync.service >/dev/null 2>&1 || true"
+  ok "SBC runtime fallback timer removed; runtime sync is Agent job only"
 }
 
 sync_runtime_config() {
@@ -556,7 +536,7 @@ main() {
   load_media_socket_file
   write_opensips_config
   enable_service
-  install_runtime_sync_units
+  remove_runtime_sync_units
   refresh_agent_capabilities
   ok "OpenSIPS SBC installed. Node UUID: ${NODE_UUID}"
 }

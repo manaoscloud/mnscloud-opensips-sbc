@@ -101,6 +101,8 @@ O instalador:
   quando o módulo oficial conseguir fazê-lo.
 - recarrega registros SIP com o MI `reg_reload` pelo FIFO local quando o control plane altera
   peers `register`, mantendo o processo OpenSIPS ativo.
+- remove qualquer unidade legada `mnscloud-opensips-sbc-sync.timer`/service; alterações de runtime
+  devem chegar pelo job `voip.sbc.runtime` do `mnscloud-agent`, sem reconciliador periódico.
 - atualiza/reinicia o `mnscloud-agent` no fim da instalação para republicar a capacidade
   `voip.sbc.manage` após o script local de sync do SBC existir no host.
 
