@@ -47,8 +47,9 @@ is installed or updated.
 - Root privileges for package installation, `/etc/opensips`, systemd, and `/etc/mnscloud`.
 - Network reachability from the OpenSIPS host to the MNSCloud API base URL.
 - `mnscloud-agent` already installed, enrolled, active, and updated with support for
-  `voip.sbc.runtime` jobs. The SBC installer fails closed when the Agent is missing or inactive,
-  because realtime runtime sync is required for a fully functional SBC.
+  `voip.sbc.runtime` jobs. The SBC installer calls
+  `/opt/mnscloud/mnscloud-agent/scripts/validate-agent.sh` and fails closed when the Agent is
+  missing, inactive, unenrolled, or too old for SBC runtime jobs.
 - A master `VoipSbcServer` record for this runtime, with engine `opensips` and a matching
   `VbsNodeUUID`, or an operational bootstrap flow that can bind the local node UUID.
 - Optional: an active `RealtimeMediaServer` selected on the `VoipSbcServer` record when this SBC
@@ -88,8 +89,8 @@ For a no-change preview:
 sudo bash scripts/install-opensips-sbc.sh --dry-run
 ```
 
-The installer first validates that `mnscloud-agent` is installed, enrolled, active, and capable of
-handling `voip.sbc.runtime` jobs. It then creates or reuses `/etc/mnscloud/sbc/node.uuid`,
+The installer first validates the Agent through the shared `validate-agent.sh` contract with
+`--require-active --require-enrolled --require-job voip.sbc.runtime`. It then creates or reuses `/etc/mnscloud/sbc/node.uuid`,
 `/etc/mnscloud/sbc/api.token`, and `/etc/mnscloud/sbc/api.base`, validates bootstrap against the
 API when possible, syncs runtime
 configuration into `/etc/mnscloud/sbc/runtime/config.json`, generates the local OpenSIPS `db_text`

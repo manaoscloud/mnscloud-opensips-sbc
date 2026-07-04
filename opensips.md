@@ -9,7 +9,8 @@ Este diretório documenta o uso do OpenSIPS como SBC do mnscloud.
 - O servidor físico mantém UUID local em `/etc/mnscloud/sbc/node.uuid`.
 - O servidor físico mantém token local em `/etc/mnscloud/sbc/api.token`.
 - O servidor físico deve ter `mnscloud-agent` instalado, enrolado, ativo e atualizado com suporte
-  ao job `voip.sbc.runtime` antes da instalação do SBC.
+  ao job `voip.sbc.runtime` antes da instalação do SBC. O instalador valida isso pelo contrato
+  central `/opt/mnscloud/mnscloud-agent/scripts/validate-agent.sh`.
 - Esse UUID é vinculado ao cadastro `VoipSbcServer.VbsNodeUUID`.
 - O hash do token é salvo em `VoipSbcServer.VbsApiTokenHash`.
 - Cada requisição runtime enviada ao mnscloud usa `node_uuid` e `Authorization: Bearer <token>` para validar o servidor.
@@ -62,8 +63,8 @@ bash scripts/install-opensips-sbc.sh
 
 O instalador:
 
-- valida primeiro se o `mnscloud-agent` está instalado, enrolado, ativo e compatível com
-  `voip.sbc.runtime`; se não estiver, a instalação para para evitar um SBC sem realtime sync;
+- valida primeiro o `mnscloud-agent` com `validate-agent.sh --require-active --require-enrolled
+  --require-job voip.sbc.runtime`; se não estiver pronto, a instalação para para evitar um SBC sem realtime sync;
 - aceita `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`, `MNSCLOUD_SBC_API_TOKEN` e
   `MNSCLOUD_SBC_ENGINE` quando o comando é gerado pela API, persistindo esses valores antes do
   bootstrap;
