@@ -77,9 +77,11 @@ O instalador:
 - cria ou reaproveita `/etc/mnscloud/sbc/node.uuid`;
 - cria ou reaproveita `/etc/mnscloud/sbc/api.token`;
 - tenta vincular o node UUID via API bootstrap usando hostname, IPv4 privado e IPv4 público descoberto;
-- sincroniza a configuração runtime via `scripts/sync-opensips-sbc-runtime.sh`;
-- gera `/etc/mnscloud/sbc/runtime/config.json` com a configuração ativa retornada pela API;
-- gera `/etc/mnscloud/sbc/dbtext/registrant` para o módulo oficial `uac_registrant`;
+- prepara os diretórios locais de runtime; a configuração ativa é gerada somente pelo job Agent
+  `voip.sbc.runtime`;
+- o job Agent gera `/etc/mnscloud/sbc/runtime/config.json` com a configuração ativa retornada pela
+  API;
+- o job Agent gera `/etc/mnscloud/sbc/dbtext/registrant` para o módulo oficial `uac_registrant`;
 - não executa SQL direto nem instala cliente MariaDB para vincular o node UUID;
 - faz backup de `/etc/opensips/opensips.cfg` como `.bkp`;
 - gera uma configuração limpa mínima para consulta HTTP ao mnscloud;
@@ -104,7 +106,7 @@ O instalador:
 - remove qualquer unidade legada `mnscloud-opensips-sbc-sync.timer`/service; alterações de runtime
   devem chegar pelo job `voip.sbc.runtime` do `mnscloud-agent`, sem reconciliador periódico.
 - atualiza/reinicia o `mnscloud-agent` no fim da instalação para republicar a capacidade
-  `voip.sbc.manage` após o script local de sync do SBC existir no host.
+  `voip.sbc.manage`, informar ausência de runtime local e receber o job inicial de sync pela API.
 
 ## Autenticação de peers
 

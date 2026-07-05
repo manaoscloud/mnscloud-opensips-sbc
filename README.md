@@ -92,15 +92,15 @@ sudo bash scripts/install-opensips-sbc.sh --dry-run
 The installer first validates the Agent through the shared `validate-agent.sh` contract with
 `--require-active --require-enrolled --require-job voip.sbc.runtime`. It then creates or reuses `/etc/mnscloud/sbc/node.uuid`,
 `/etc/mnscloud/sbc/api.token`, and `/etc/mnscloud/sbc/api.base`, validates bootstrap against the
-API when possible, syncs runtime
-configuration into `/etc/mnscloud/sbc/runtime/config.json`, generates the local OpenSIPS `db_text`
-registrant table for active REGISTER peers, writes the OpenSIPS configuration, and keeps the
-original `/etc/opensips/opensips.cfg` as `/etc/opensips/opensips.cfg.bkp`. It also configures
-OpenSIPS memory defaults in `/etc/default/opensips` and removes any legacy
+API when possible, prepares the local OpenSIPS runtime directories, writes the OpenSIPS
+configuration, and keeps the original `/etc/opensips/opensips.cfg` as
+`/etc/opensips/opensips.cfg.bkp`. It also configures OpenSIPS memory defaults in
+`/etc/default/opensips` and removes any legacy
 `mnscloud-opensips-sbc-sync.timer`/service units. Runtime changes must be delivered by the
 MNSCloud Agent `voip.sbc.runtime` job, with no periodic fallback reconciler. At the end of a
 successful install, it refreshes or restarts the Agent so the host publishes the effective
-`voip.sbc.manage` capability after the local SBC sync command exists.
+`voip.sbc.manage` capability and requests the initial runtime sync when local runtime config is
+missing.
 
 API-generated commands may pass `MNSCLOUD_API_BASE`, `MNSCLOUD_SBC_NODE_UUID`, and
 `MNSCLOUD_SBC_API_TOKEN`; when present, the installer persists those values before bootstrapping.
@@ -188,9 +188,10 @@ The installed `mi_fifo` configuration keeps the command FIFO at
 slash in the `reply_dir` value; OpenSIPS builds the reply FIFO path from that directory and the
 reply FIFO name sent in the MI command.
 
-During install/update, the installer asks OpenSIPS to force active REGISTER peers once after the
-service restart. After bootstrap, runtime changes are reconciled only by the MNSCloud Agent
-`voip.sbc.runtime` job.
+During install/update, the installer does not apply runtime sync directly. The MNSCloud Agent
+publishes the node UUID and local runtime state in heartbeat; the API then queues a
+`voip.sbc.runtime` job for the Agent whenever the assignment is new or the local runtime config is
+missing.
 
 ## Rollback
 

@@ -485,11 +485,6 @@ enable_service() {
   run "systemctl enable opensips"
   run "systemctl restart opensips"
   run "systemctl is-active opensips"
-  if [[ "$DRY_RUN" == true ]]; then
-    log DRY "force active OpenSIPS UAC registrations"
-  else
-    MNSCLOUD_SBC_FORCE_REGISTER=true bash "${SCRIPT_DIR}/sync-and-reload-opensips-sbc.sh" || warn "SBC runtime reload/REGISTER force failed; inspect OpenSIPS MI and registrant state"
-  fi
 }
 
 remove_runtime_sync_units() {
@@ -502,16 +497,6 @@ remove_runtime_sync_units() {
   run "systemctl daemon-reload"
   run "systemctl reset-failed mnscloud-opensips-sbc-sync.timer mnscloud-opensips-sbc-sync.service >/dev/null 2>&1 || true"
   ok "SBC runtime fallback timer removed; runtime sync is Agent job only"
-}
-
-sync_runtime_config() {
-  local sync_script="${SCRIPT_DIR}/sync-opensips-sbc-runtime.sh"
-  [[ -x "${sync_script}" ]] || run "chmod +x '${sync_script}'"
-  if [[ "$DRY_RUN" == true ]]; then
-    log DRY "bash '${sync_script}' --dry-run"
-    return 0
-  fi
-  bash "${sync_script}"
 }
 
 main() {
@@ -530,7 +515,6 @@ main() {
   case "$(detect_opensips_os)" in debian) install_packages_debian ;; rocky) install_packages_rocky ;; esac
   configure_opensips_defaults
   bootstrap_node_via_api || true
-  sync_runtime_config || warn "SBC runtime config sync failed; installer will continue with the last local runtime state if present"
   ensure_opensips_dbtext_permissions
   ensure_opensips_runtime_dirs
   load_media_socket_file
