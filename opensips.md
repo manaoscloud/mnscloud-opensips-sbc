@@ -136,7 +136,7 @@ resultado consolidado em `VoipSbcPeer`.
 - Políticas de codec ficam no control plane do `VoipSbcPipe` e devem ser aplicadas conforme
   instruções retornadas pela API. O padrão operacional é codec pass-through; transcoding deve ser
   tratado como exceção explícita por capacidade do media relay e decisão do master.
-- O CDR do Pipe é opt-in (`VbpEnableCdr = 0` por padrão). Quando ativado, o runtime envia evento
+- O CDR do Peer é opt-in (`VspEnableCdr = 0` por padrão). Quando ativado no peer de entrada, o runtime envia evento
   `invite` para `/api/v1/sbc/runtime/accounting` com Call-ID, pipe, peer de entrada, origem,
   destino e saída escolhida. A API persiste o evento em `VoipSbcCdr`.
 

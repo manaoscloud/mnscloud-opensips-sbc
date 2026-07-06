@@ -230,8 +230,8 @@ See `opensips.md` and `SECURITY.md` for details.
 - Pipe lookup is API-controlled. The connector sends source/local/RURI/From/To context; the API
   identifies the inbound peer, selects exactly one authorized pipe to a direct outbound SIP destination, or
   fails closed on ambiguity.
-- Pipe CDR is opt-in. New pipes default to CDR disabled and must explicitly enable accounting when
-  call detail collection is required. When enabled, the runtime posts an `invite` accounting event
+- Peer CDR is opt-in. New peers default to CDR disabled and must explicitly enable accounting when
+  call detail collection is required. When enabled on the inbound peer, the runtime posts an `invite` accounting event
   with Call-ID, pipe, inbound peer, source, destination and selected outbound target to the API,
   which persists it in `VoipSbcCdr`.
 - The generated OpenSIPS 3.6 config uses `$si`/`$sp` for the remote source and
