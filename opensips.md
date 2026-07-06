@@ -88,6 +88,10 @@ O instalador:
 - grava o Bearer token local no `opensips.cfg` para autenticar as chamadas runtime contra a API;
 - grava `/etc/mnscloud/sbc/media.socket` quando a API retorna `rtpengineSocket`;
 - habilita `rtpengine.so` e `rtpengine_offer/answer/delete` apenas quando existe media relay associado;
+- anuncia o socket SIP com o IPv4 público detectado, ou o primeiro IPv4 privado como fallback;
+- aplica `record_route()` em chamadas encaminhadas para manter ACK/BYE/re-INVITE no caminho do SBC;
+- resolve ACK sem Route pelo mesmo contrato `/sbc/runtime/pipe`, negando silenciosamente quando não
+  houver pipe ativo para evitar loop local;
 - define os cabeçalhos SIP gerados `Server` e `User-Agent` como `MNSCloud OpenSIPS SBC`;
 - define `mpath` no `opensips.cfg` conforme a distro/arquitetura para carregar os módulos oficiais instalados em `/usr/lib/<multiarch>/opensips/modules/` ou `/usr/lib64/opensips/modules/`.
 - carrega explicitamente `proto_udp.so` e `proto_tcp.so`, exigidos pelo OpenSIPS 3.6 para escutar nos sockets SIP UDP/TCP.

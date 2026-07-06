@@ -111,6 +111,11 @@ When the API returns `rtpengineSocket`, the installer stores it in
 configuration. Without an assigned media relay, OpenSIPS runs as SIP signaling/SBC only.
 The generated OpenSIPS configuration sets both SIP `Server` and `User-Agent` headers to
 `MNSCloud OpenSIPS SBC`.
+Generated SIP sockets listen on all interfaces and advertise the detected public IPv4, falling
+back to the first private IPv4 when public detection is unavailable. Initial INVITEs are
+Record-Routed so ACK/BYE/re-INVITE requests stay on the SBC path; ACK requests without route
+headers are resolved through the same runtime pipe contract and fail closed when no active pipe is
+found.
 
 ## Validate
 

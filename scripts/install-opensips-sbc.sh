@@ -239,6 +239,21 @@ public_ipv4() {
     true
 }
 
+opensips_advertised_ipv4() {
+  local value
+  value="$(public_ipv4)"
+  if [[ -n "${value}" ]]; then
+    printf '%s\n' "${value}"
+    return 0
+  fi
+  value="$(private_ipv4)"
+  if [[ -n "${value}" ]]; then
+    printf '%s\n' "${value}"
+    return 0
+  fi
+  printf '127.0.0.1\n'
+}
+
 bootstrap_node_via_api() {
   local hostname_value private_ip public_ip payload response_file http_code server_uuid media_socket
   hostname_value="$(hostname -f 2>/dev/null || hostname 2>/dev/null || true)"
@@ -377,8 +392,9 @@ opensips_module_path() {
 }
 
 write_opensips_config() {
-  local cfg="/etc/opensips/opensips.cfg" module_path sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply=""
+  local cfg="/etc/opensips/opensips.cfg" module_path advertised_ip sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply=""
   module_path="$(opensips_module_path)"
+  advertised_ip="$(opensips_advertised_ipv4)"
   if [[ -r "${module_path%/}/sip_i.so" ]]; then
     sip_i_modules='loadmodule "sip_i.so"'
   else
@@ -430,8 +446,8 @@ xlog_level=3
 udp_workers=4
 server_header=\"Server: MNSCloud OpenSIPS SBC\"
 user_agent_header=\"User-Agent: MNSCloud OpenSIPS SBC\"
-socket=udp:0.0.0.0:5060
-socket=tcp:0.0.0.0:5060
+socket=udp:0.0.0.0:5060 as ${advertised_ip}:5060
+socket=tcp:0.0.0.0:5060 as ${advertised_ip}:5060
 mpath=\"${module_path}\"
 
 loadmodule \"proto_udp.so\"
@@ -454,7 +470,34 @@ ${rtpengine_params}
 route {
   if (!mf_process_maxfwd_header(10)) { sl_send_reply(483, \"Too Many Hops\"); exit; }
   if (is_method(\"OPTIONS\")) { sl_send_reply(200, \"OK\"); exit; }
+
+  if (has_totag() && loose_route()) {
 ${rtpengine_bye}
+    if (!t_relay()) { sl_send_reply(500, \"Relay failed\"); }
+    exit;
+  }
+
+  if (is_method(\"ACK\")) {
+    xlog(\"L_INFO\", \"mnscloud SBC ACK pipe lookup for \$rU from \$si\\n\");
+    \$var(pipe_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"direction\\\":\\\"inbound\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"auth_username\\\":\\\"\" + \$au + \"\\\"}\";
+    rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+    rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+    \$var(rest_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/pipe?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(pipe_payload), \"application/json\", \$var(body), \$var(ct), \$var(http_code));
+    if (\$var(rest_rc) < 0 || \$var(http_code) != 200) { exit; }
+    \$json(pipe) := \$var(body);
+    if (\$json(pipe/allowed) != \"true\") { exit; }
+    if (\$json(pipe/host) == NULL || \$json(pipe/port) == NULL) { exit; }
+    \$var(dst_transport) = \$json(pipe/transport);
+    if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
+    \$du = \"sip:\" + \$json(pipe/host) + \":\" + \$json(pipe/port) + \";transport=\" + \$var(dst_transport);
+    if (!t_relay()) { exit; }
+    exit;
+  }
+
+  if (has_totag()) {
+    sl_send_reply(404, \"Not here\");
+    exit;
+  }
 
   if (is_method(\"INVITE\")) {
     xlog(\"L_INFO\", \"mnscloud SBC pipe lookup for \$rU from \$si\\n\");
@@ -470,6 +513,7 @@ ${rtpengine_bye}
     \$var(dst_transport) = \$json(pipe/transport);
     if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
     \$du = \"sip:\" + \$json(pipe/host) + \":\" + \$json(pipe/port) + \";transport=\" + \$var(dst_transport);
+    record_route();
     if (\$json(pipe/codecPolicy/enableCdr) == \"1\") {
       \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"invite\\\",\\\"direction\\\":\\\"\" + \$json(pipe/direction) + \"\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$json(pipe/pipeUUID) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$json(pipe/inputPeerUUID) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$json(pipe/host) + \"\\\",\\\"output_port\\\":\" + \$json(pipe/port) + \",\\\"output_transport\\\":\\\"\" + \$var(dst_transport) + \"\\\"}\";
       rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
