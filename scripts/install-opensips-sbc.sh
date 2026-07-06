@@ -477,7 +477,12 @@ ${rtpengine_bye}
     exit;
   }
 
-  if (is_method(\"ACK\")) {
+  if (has_totag() && is_method(\"ACK\")) {
+    xlog(\"L_WARN\", \"mnscloud SBC dropping in-dialog ACK without Route for \$ci from \$si\\n\");
+    exit;
+  }
+
+  if (!has_totag() && is_method(\"ACK\")) {
     xlog(\"L_INFO\", \"mnscloud SBC ACK pipe lookup for \$rU from \$si\\n\");
     \$var(pipe_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"direction\\\":\\\"inbound\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"auth_username\\\":\\\"\" + \$au + \"\\\"}\";
     rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
