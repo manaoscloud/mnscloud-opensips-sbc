@@ -113,8 +113,11 @@ O instalador:
 - `ip`: usado para peers por IP. A API identifica o Inbound por `VspAllowedSourceAddresses`
   e só encaminha quando encontra um pipe ativo e não ambíguo para o peer de saída.
 - `register`: o sync gera registros no `db_text` local para o `uac_registrant`, usando
-  registrar/AOR/contact/usuário/senha vindos do control plane. Como o módulo oficial mantém esses
-  registros em memória, alterações são aplicadas em runtime via MI `reg_reload`.
+  registrar/AOR/contact/usuário/senha vindos do control plane. Como chamadas entrantes de
+  operadoras registradas normalmente chegam sem `Authorization` no INVITE, o Inbound deve ter
+  `VspAllowedSourceAddresses` preenchido com os IPs autorizados da operadora quando o match não
+  puder ser feito por usuário de autenticação. Como o módulo oficial mantém esses registros em
+  memória, alterações são aplicadas em runtime via MI `reg_reload`.
 - `ip_digest`: reservado para operadoras que exigem IP fixo mais desafio digest em chamadas
   originadas; a política fica no control plane e deve ser tratada como caso explícito.
 - `none`: somente para cenários internos controlados, nunca como padrão de operadora externa.
@@ -133,6 +136,9 @@ resultado consolidado em `VoipSbcPeer`.
 - Políticas de codec ficam no control plane do `VoipSbcPipe` e devem ser aplicadas conforme
   instruções retornadas pela API. O padrão operacional é codec pass-through; transcoding deve ser
   tratado como exceção explícita por capacidade do media relay e decisão do master.
+- O CDR do Pipe é opt-in (`VbpEnableCdr = 0` por padrão). Quando ativado, o runtime envia evento
+  `invite` para `/api/v1/sbc/runtime/accounting` com Call-ID, pipe, peer de entrada, origem,
+  destino e saída escolhida. A API persiste o evento em `VoipSbcCdr`.
 
 ## Validação, atualização e rollback
 

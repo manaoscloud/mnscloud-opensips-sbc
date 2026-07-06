@@ -470,6 +470,13 @@ ${rtpengine_bye}
     \$var(dst_transport) = \$json(pipe/transport);
     if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
     \$du = \"sip:\" + \$json(pipe/host) + \":\" + \$json(pipe/port) + \";transport=\" + \$var(dst_transport);
+    if (\$json(pipe/codecPolicy/enableCdr) == \"1\") {
+      \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"invite\\\",\\\"direction\\\":\\\"\" + \$json(pipe/direction) + \"\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$json(pipe/pipeUUID) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$json(pipe/inputPeerUUID) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$json(pipe/host) + \"\\\",\\\"output_port\\\":\" + \$json(pipe/port) + \",\\\"output_transport\\\":\\\"\" + \$var(dst_transport) + \"\\\"}\";
+      rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+      rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+      \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
+      if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC accounting failed for \$ci\\n\"); }
+    }
 ${rtpengine_offer}
   }
 

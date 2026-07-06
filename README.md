@@ -214,9 +214,11 @@ See `opensips.md` and `SECURITY.md` for details.
 - Codec policy is represented in SBC pipes and must remain API/control-plane driven; the
   connector applies only the runtime instructions returned by the API contract.
 - Peer authentication supports the control-plane modes `ip`, `register`, `ip_digest`, and `none`.
-  IP authentication must be backed by explicit allowed source addresses. REGISTER and OPTIONS
-  status must be reported back to `/api/v1/sbc/runtime/peer-status`; tenant users should not edit
-  runtime health fields directly.
+  IP authentication must be backed by explicit allowed source addresses. REGISTER peers should also
+  define allowed source addresses for inbound calls when the carrier sends INVITEs without
+  Authorization, otherwise pipe lookup fails closed. REGISTER and OPTIONS status must be reported
+  back to `/api/v1/sbc/runtime/peer-status`; tenant users should not edit runtime health fields
+  directly.
 - REGISTER peers are exported to the official OpenSIPS `uac_registrant` module through a local
   `db_text` database generated from the authenticated runtime config endpoint. The local table is
   an OpenSIPS module requirement; changes are applied at runtime through MI `reg_reload`, not by
@@ -228,5 +230,9 @@ See `opensips.md` and `SECURITY.md` for details.
 - Pipe lookup is API-controlled. The connector sends source/local/RURI/From/To context; the API
   identifies the inbound peer, selects exactly one authorized pipe to a direct outbound SIP destination, or
   fails closed on ambiguity.
+- Pipe CDR is opt-in. New pipes default to CDR disabled and must explicitly enable accounting when
+  call detail collection is required. When enabled, the runtime posts an `invite` accounting event
+  with Call-ID, pipe, inbound peer, source, destination and selected outbound target to the API,
+  which persists it in `VoipSbcCdr`.
 - The generated OpenSIPS 3.6 config uses `$si`/`$sp` for the remote source and
   `$socket_in(proto|ip|port)` for the received local socket context.
