@@ -478,7 +478,6 @@ ${sip_i_modules}
 ${uac_modules}
 ${rtpengine_modules}
 
-modparam("rr", "enable_full_lr", 1)
 ${uac_params}
 ${rtpengine_params}
 
