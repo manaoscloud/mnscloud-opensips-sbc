@@ -142,6 +142,9 @@ resultado consolidado em `VoipSbcPeer`.
   `RealtimeMediaServer` associado.
 - Sem `RealtimeMediaServer`, o SBC sinaliza chamadas sem media relay e o RTP depende do caminho
   direto entre as pontas.
+- O roteamento de diálogo usa `Record-Route` e `loose_route`; o módulo `rr` deve operar com
+  `enable_full_lr=1` para gerar `;lr=on` e reduzir falhas com equipamentos que descartam ou
+  interpretam incorretamente o parâmetro `lr` em ACK/BYE sequenciais.
 - Políticas de codec ficam no control plane do `VoipSbcPipe` e devem ser aplicadas conforme
   instruções retornadas pela API. O padrão operacional é codec pass-through; transcoding deve ser
   tratado como exceção explícita por capacidade do media relay e decisão do master.

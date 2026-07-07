@@ -478,6 +478,7 @@ ${sip_i_modules}
 ${uac_modules}
 ${rtpengine_modules}
 
+modparam("rr", "enable_full_lr", 1)
 ${uac_params}
 ${rtpengine_params}
 
@@ -499,7 +500,7 @@ ${rtpengine_bye}
   }
 
   if (has_totag() && is_method(\"ACK\")) {
-    xlog(\"L_WARN\", \"mnscloud SBC dropping in-dialog ACK without Route for \$ci from \$si to \$ru; expected Record-Route/Route set\\n\");
+    xlog(\"L_WARN\", \"mnscloud SBC dropping in-dialog ACK without Route for \$ci from \$si to \$ru route=\$hdr(Route) contact=\$hdr(Contact); expected Record-Route/Route set\\n\");
     if (t_check_trans()) { t_relay(); }
     exit;
   }
