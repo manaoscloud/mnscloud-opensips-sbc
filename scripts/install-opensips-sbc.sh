@@ -392,7 +392,7 @@ opensips_module_path() {
 }
 
 write_opensips_config() {
-  local cfg="/etc/opensips/opensips.cfg" module_path advertised_ip sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply=""
+  local cfg="/etc/opensips/opensips.cfg" module_path advertised_ip sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply_body=""
   module_path="$(opensips_module_path)"
   advertised_ip="$(opensips_advertised_ipv4)"
   if [[ -r "${module_path%/}/sip_i.so" ]]; then
@@ -429,14 +429,11 @@ modparam(\"mi_fifo\", \"fifo_mode\", 0660)"
     rtpengine_offer='    if (has_body("application/sdp")) {
       rtpengine_offer("replace-origin replace-session-connection");
     }
-    t_on_reply("MNSCLOUD_RTPENGINE_REPLY");
 '
-    rtpengine_reply='
-onreply_route[MNSCLOUD_RTPENGINE_REPLY] {
+    rtpengine_reply_body='
   if (has_body("application/sdp")) {
     rtpengine_answer("replace-origin replace-session-connection");
   }
-}
 '
   fi
   backup_once "$cfg"
@@ -472,6 +469,13 @@ route {
   if (is_method(\"OPTIONS\")) { sl_send_reply(200, \"OK\"); exit; }
 
   if (has_totag() && loose_route()) {
+    if (is_method(\"BYE\")) {
+      \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"bye\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\"}\";
+      rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+      rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+      \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
+      if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC BYE accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
+    }
 ${rtpengine_bye}
     if (!t_relay()) { sl_send_reply(500, \"Relay failed\"); }
     exit;
@@ -504,6 +508,16 @@ ${rtpengine_bye}
     exit;
   }
 
+  if (is_method(\"CANCEL\")) {
+    \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"cancel\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\"}\";
+    rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+    rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+    \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
+    if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC CANCEL accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
+    if (!t_relay()) { sl_send_reply(500, \"Relay failed\"); }
+    exit;
+  }
+
   if (is_method(\"INVITE\")) {
     xlog(\"L_INFO\", \"mnscloud SBC pipe lookup for \$rU from \$si\\n\");
     \$var(pipe_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"direction\\\":\\\"inbound\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"auth_username\\\":\\\"\" + \$au + \"\\\"}\";
@@ -519,20 +533,48 @@ ${rtpengine_bye}
     if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
     \$du = \"sip:\" + \$json(pipe/host) + \":\" + \$json(pipe/port) + \";transport=\" + \$var(dst_transport);
     record_route();
+    \$avp(mns_enable_cdr) = 0;
     if (\$json(pipe/codecPolicy/enableCdr) == 1 || \$json(pipe/codecPolicy/enableCdr) == \"1\" || \$json(pipe/codecPolicy/enableCdr) == \"true\") {
+      \$avp(mns_enable_cdr) = 1;
+      \$avp(mns_pipe_uuid) = \$json(pipe/pipeUUID);
+      \$avp(mns_input_peer_uuid) = \$json(pipe/inputPeerUUID);
+      \$avp(mns_direction) = \$json(pipe/direction);
+      \$avp(mns_output_host) = \$json(pipe/host);
+      \$avp(mns_output_port) = \$json(pipe/port);
+      \$avp(mns_output_transport) = \$var(dst_transport);
       \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"invite\\\",\\\"direction\\\":\\\"\" + \$json(pipe/direction) + \"\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$json(pipe/pipeUUID) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$json(pipe/inputPeerUUID) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$json(pipe/host) + \"\\\",\\\"output_port\\\":\" + \$json(pipe/port) + \",\\\"output_transport\\\":\\\"\" + \$var(dst_transport) + \"\\\"}\";
       rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
       rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
       \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
       if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
     }
+    t_on_reply(\"MNSCLOUD_REPLY\");
 ${rtpengine_offer}
   }
 
-  if (!t_relay()) { sl_send_reply(500, \"Relay failed\"); }
+  if (!t_relay()) {
+    if (\$avp(mns_enable_cdr) == 1) {
+      \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"failed\\\",\\\"direction\\\":\\\"\" + \$avp(mns_direction) + \"\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$avp(mns_pipe_uuid) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$avp(mns_input_peer_uuid) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$avp(mns_output_host) + \"\\\",\\\"output_port\\\":\" + \$avp(mns_output_port) + \",\\\"output_transport\\\":\\\"\" + \$avp(mns_output_transport) + \"\\\",\\\"sip_code\\\":500,\\\"sip_reason\\\":\\\"Relay failed\\\"}\";
+      rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+      rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+      \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
+      if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC relay accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
+    }
+    sl_send_reply(500, \"Relay failed\");
+  }
   exit;
 }
-${rtpengine_reply}
+
+onreply_route[MNSCLOUD_REPLY] {
+${rtpengine_reply_body}
+  if (\$avp(mns_enable_cdr) == 1 && \$rs >= 200) {
+    \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"reply\\\",\\\"direction\\\":\\\"\" + \$avp(mns_direction) + \"\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$avp(mns_pipe_uuid) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$avp(mns_input_peer_uuid) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$avp(mns_output_host) + \"\\\",\\\"output_port\\\":\" + \$avp(mns_output_port) + \",\\\"output_transport\\\":\\\"\" + \$avp(mns_output_transport) + \"\\\",\\\"sip_code\\\":\" + \$rs + \",\\\"sip_reason\\\":\\\"\" + \$rr + \"\\\"}\";
+    rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+    rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+    \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
+    if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC reply accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
+  }
+}
 "
   run "opensips -C -f '${cfg}'"
 }

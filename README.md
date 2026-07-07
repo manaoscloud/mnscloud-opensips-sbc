@@ -236,8 +236,10 @@ See `opensips.md` and `SECURITY.md` for details.
   identifies the inbound peer, selects exactly one authorized pipe to a direct outbound SIP destination, or
   fails closed on ambiguity.
 - Peer CDR is opt-in. New peers default to CDR disabled and must explicitly enable accounting when
-  call detail collection is required. When enabled on the inbound peer, the runtime posts an `invite` accounting event
-  with Call-ID, pipe, inbound peer, source, destination and selected outbound target to the API,
-  which persists it in `VoipSbcCdr`.
+  call detail collection is required. When enabled on the inbound peer, the runtime posts `invite`,
+  final `reply`, `cancel`, `bye`, and local `failed` accounting events with Call-ID, pipe, inbound
+  peer, source, destination, selected outbound target, and SIP response metadata to the API, which
+  persists them in `VoipSbcCdr`. BYE/CANCEL events are resolved by Call-ID so the API can consolidate
+  the call lifecycle without requiring static runtime state in OpenSIPS.
 - The generated OpenSIPS 3.6 config uses `$si`/`$sp` for the remote source and
   `$socket_in(proto|ip|port)` for the received local socket context.
