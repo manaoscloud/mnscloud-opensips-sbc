@@ -90,9 +90,11 @@ O instalador:
 - habilita `rtpengine.so` e `rtpengine_offer/answer/delete` apenas quando existe media relay associado;
 - anuncia o socket SIP com o IPv4 público detectado, ou o primeiro IPv4 privado como fallback;
 - aplica `record_route()` em chamadas encaminhadas para manter ACK/BYE/re-INVITE no caminho do SBC;
-- quando recebe ACK in-dialog sem `Route`, não recalcula Pipe nem chama a API; tenta relatar o ACK
-  pelo próprio R-URI/Contact do diálogo e registra erro se o relay falhar, evitando tanto loop de
-  decisão quanto queda por ACK descartado;
+- quando o servidor tem IP público e privado diferentes, usa double Record-Route com `r2=on` para
+  preservar o caminho correto entre lado público e lado privado do diálogo;
+- quando recebe ACK in-dialog sem `Route`, não recalcula Pipe nem tenta relatar cegamente pelo
+  R-URI, pois isso pode criar loop local quando o R-URI aponta para o próprio SBC; esse caso é
+  registrado como falha de Record-Route/Route set esperada;
 - falha explicitamente o INVITE quando `rtpengine_offer()` não consegue ancorar a mídia e registra
   erro em `rtpengine_answer()` para facilitar diagnóstico de áudio unilateral;
 - define os cabeçalhos SIP gerados `Server` e `User-Agent` como `MNSCloud OpenSIPS SBC`;

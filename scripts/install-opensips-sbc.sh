@@ -392,9 +392,20 @@ opensips_module_path() {
 }
 
 write_opensips_config() {
-  local cfg="/etc/opensips/opensips.cfg" module_path advertised_ip sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply_body=""
+  local cfg="/etc/opensips/opensips.cfg" module_path advertised_ip private_ip record_route_block sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply_body=""
   module_path="$(opensips_module_path)"
   advertised_ip="$(opensips_advertised_ipv4)"
+  private_ip="$(private_ipv4)"
+  if [[ -n "${private_ip}" && -n "${advertised_ip}" && "${private_ip}" != "${advertised_ip}" ]]; then
+    record_route_block="    if (\$si =~ \"^(10\\\\.|172\\\\.(1[6-9]|2[0-9]|3[0-1])\\\\.|192\\\\.168\\\\.)\") {
+      record_route_preset(\"${advertised_ip}:5060\", \"${private_ip}:5060\");
+    } else {
+      record_route_preset(\"${private_ip}:5060\", \"${advertised_ip}:5060\");
+    }
+    add_rr_param(\";r2=on\");"
+  else
+    record_route_block="    record_route();"
+  fi
   if [[ -r "${module_path%/}/sip_i.so" ]]; then
     sip_i_modules='loadmodule "sip_i.so"'
   else
@@ -488,8 +499,8 @@ ${rtpengine_bye}
   }
 
   if (has_totag() && is_method(\"ACK\")) {
-    xlog(\"L_WARN\", \"mnscloud SBC relaying in-dialog ACK without Route for \$ci from \$si to \$ru\\n\");
-    if (!t_relay()) { xlog(\"L_ERR\", \"mnscloud SBC failed to relay in-dialog ACK without Route for \$ci from \$si to \$ru\\n\"); }
+    xlog(\"L_WARN\", \"mnscloud SBC dropping in-dialog ACK without Route for \$ci from \$si to \$ru; expected Record-Route/Route set\\n\");
+    if (t_check_trans()) { t_relay(); }
     exit;
   }
 
@@ -539,7 +550,7 @@ ${rtpengine_bye}
     \$var(dst_transport) = \$json(pipe/transport);
     if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
     \$du = \"sip:\" + \$json(pipe/host) + \":\" + \$json(pipe/port) + \";transport=\" + \$var(dst_transport);
-    record_route();
+${record_route_block}
     \$avp(mns_enable_cdr) = 0;
     if (\$json(pipe/codecPolicy/enableCdr) == 1 || \$json(pipe/codecPolicy/enableCdr) == \"1\" || \$json(pipe/codecPolicy/enableCdr) == \"true\") {
       \$avp(mns_enable_cdr) = 1;
