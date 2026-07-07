@@ -90,8 +90,11 @@ O instalador:
 - habilita `rtpengine.so` e `rtpengine_offer/answer/delete` apenas quando existe media relay associado;
 - anuncia o socket SIP com o IPv4 público detectado, ou o primeiro IPv4 privado como fallback;
 - aplica `record_route()` em chamadas encaminhadas para manter ACK/BYE/re-INVITE no caminho do SBC;
-- descarta ACK in-dialog sem `Route` de forma silenciosa/fail-closed para evitar nova decisão de
-  Pipe e loop local contra o próprio SBC;
+- quando recebe ACK in-dialog sem `Route`, não recalcula Pipe nem chama a API; tenta relatar o ACK
+  pelo próprio R-URI/Contact do diálogo e registra erro se o relay falhar, evitando tanto loop de
+  decisão quanto queda por ACK descartado;
+- falha explicitamente o INVITE quando `rtpengine_offer()` não consegue ancorar a mídia e registra
+  erro em `rtpengine_answer()` para facilitar diagnóstico de áudio unilateral;
 - define os cabeçalhos SIP gerados `Server` e `User-Agent` como `MNSCloud OpenSIPS SBC`;
 - define `mpath` no `opensips.cfg` conforme a distro/arquitetura para carregar os módulos oficiais instalados em `/usr/lib/<multiarch>/opensips/modules/` ou `/usr/lib64/opensips/modules/`.
 - carrega explicitamente `proto_udp.so` e `proto_tcp.so`, exigidos pelo OpenSIPS 3.6 para escutar nos sockets SIP UDP/TCP.

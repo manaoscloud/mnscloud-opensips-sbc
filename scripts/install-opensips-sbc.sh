@@ -426,15 +426,21 @@ modparam(\"mi_fifo\", \"fifo_mode\", 0660)"
     rtpengine_delete();
   }
 '
-    rtpengine_offer='    if (has_body("application/sdp")) {
-      rtpengine_offer("replace-origin replace-session-connection");
+    rtpengine_offer="    if (has_body(\"application/sdp\")) {
+      if (!rtpengine_offer(\"replace-origin replace-session-connection\")) {
+        xlog(\"L_ERR\", \"mnscloud SBC rtpengine_offer failed for \$ci using ${MEDIA_SOCKET}\\n\");
+        sl_send_reply(500, \"Media relay failed\");
+        exit;
+      }
     }
-'
-    rtpengine_reply_body='
-  if (has_body("application/sdp")) {
-    rtpengine_answer("replace-origin replace-session-connection");
+"
+    rtpengine_reply_body="
+  if (has_body(\"application/sdp\")) {
+    if (!rtpengine_answer(\"replace-origin replace-session-connection\")) {
+      xlog(\"L_ERR\", \"mnscloud SBC rtpengine_answer failed for \$ci using ${MEDIA_SOCKET}\\n\");
+    }
   }
-'
+"
   fi
   backup_once "$cfg"
   write_file "$cfg" "#### MNSCloud OpenSIPS SBC ####
@@ -482,7 +488,8 @@ ${rtpengine_bye}
   }
 
   if (has_totag() && is_method(\"ACK\")) {
-    xlog(\"L_WARN\", \"mnscloud SBC dropping in-dialog ACK without Route for \$ci from \$si\\n\");
+    xlog(\"L_WARN\", \"mnscloud SBC relaying in-dialog ACK without Route for \$ci from \$si to \$ru\\n\");
+    if (!t_relay()) { xlog(\"L_ERR\", \"mnscloud SBC failed to relay in-dialog ACK without Route for \$ci from \$si to \$ru\\n\"); }
     exit;
   }
 
