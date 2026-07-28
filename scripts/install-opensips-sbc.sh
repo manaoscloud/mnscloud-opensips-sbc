@@ -545,7 +545,11 @@ ${rtpengine_bye}
     if (\$var(rest_rc) < 0) { sl_send_reply(503, \"Pipe lookup failed\"); exit; }
     if (\$var(http_code) != 200) { sl_send_reply(503, \"Pipe lookup failed\"); exit; }
     \$json(pipe) := \$var(body);
-    if (\$json(pipe/allowed) != \"true\") { sl_send_reply(403, \"Pipe not allowed\"); exit; }
+    if (\$json(pipe/allowed) != \"true\") {
+      xlog(\"L_WARN\", \"MNSCloud SIP edge denied engine=${SBC_ENGINE} source=\$si username=\$fU domain=\$fd reason=pipe\\n\");
+      sl_send_reply(403, \"Pipe not allowed\");
+      exit;
+    }
     if (\$json(pipe/host) == NULL || \$json(pipe/port) == NULL) { sl_send_reply(503, \"Pipe target missing\"); exit; }
     \$var(dst_transport) = \$json(pipe/transport);
     if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }

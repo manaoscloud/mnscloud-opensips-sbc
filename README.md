@@ -239,6 +239,9 @@ See `opensips.md` and `SECURITY.md` for details.
 - Pipe lookup is API-controlled. The connector sends source/local/RURI/From/To context; the API
   identifies the inbound peer, selects exactly one authorized pipe to a direct outbound SIP destination, or
   fails closed on ambiguity.
+- Denied SIP edge requests are emitted as structured `MNSCloud SIP edge denied` logs. When the
+  host is assigned the `sbc-edge` Cyber Security profile, the Agent supplies those events to
+  CrowdSec so repeated abuse from a source IP can receive a managed firewall decision.
 - Peer CDR is opt-in. New peers default to CDR disabled and must explicitly enable accounting when
   call detail collection is required. When enabled on the inbound peer, the runtime posts `invite`,
   final `reply`, `cancel`, `bye`, and local `failed` accounting events with Call-ID, pipe, inbound
