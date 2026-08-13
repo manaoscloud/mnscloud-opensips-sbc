@@ -12,6 +12,8 @@ API_BASE_FILE="/etc/mnscloud/sbc/api.base"
 CONFIG_FILE="/etc/mnscloud/sbc/runtime/config.json"
 SBC_ENGINE="${MNSCLOUD_SBC_ENGINE:-opensips}"
 STATUS_DELAY_SECONDS="${MNSCLOUD_SBC_STATUS_REPORT_DELAY:-2}"
+HTTP_CONNECT_TIMEOUT_SECONDS="${MNSCLOUD_SBC_HTTP_CONNECT_TIMEOUT:-5}"
+HTTP_MAX_TIME_SECONDS="${MNSCLOUD_SBC_HTTP_MAX_TIME:-30}"
 
 read_required_file() {
   local file="$1" label="$2" value
@@ -75,6 +77,8 @@ post_peer_status() {
   local api_base="$1" node_uuid="$2" api_token="$3" payload="$4" response_file http_code
   response_file="$(mktemp)"
   http_code="$(curl -sS -o "$response_file" -w "%{http_code}" \
+    --connect-timeout "$HTTP_CONNECT_TIMEOUT_SECONDS" \
+    --max-time "$HTTP_MAX_TIME_SECONDS" \
     -X POST "${api_base}/api/v1/sbc/runtime/peer-status?node_uuid=${node_uuid}&engine=${SBC_ENGINE}" \
     -H "Content-Type: application/json" \
     -H "Authorization: Bearer ${api_token}" \

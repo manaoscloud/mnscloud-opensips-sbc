@@ -14,6 +14,8 @@ DBTEXT_DIR="/etc/mnscloud/sbc/dbtext"
 CONFIG_FILE="${RUNTIME_DIR}/config.json"
 SUMMARY_FILE="${RUNTIME_DIR}/summary.json"
 SBC_ENGINE="${MNSCLOUD_SBC_ENGINE:-opensips}"
+HTTP_CONNECT_TIMEOUT_SECONDS="${MNSCLOUD_SBC_HTTP_CONNECT_TIMEOUT:-5}"
+HTTP_MAX_TIME_SECONDS="${MNSCLOUD_SBC_HTTP_MAX_TIME:-60}"
 
 read_required_file() {
   local file="$1" label="$2" value
@@ -69,7 +71,7 @@ sync_runtime_config() {
   secure_dbtext_path
 
   response_file="$(mktemp)"
-  http_code="$(curl -sS -o "${response_file}" -w "%{http_code}" -X POST "${api_base}/api/v1/sbc/runtime/config?node_uuid=${node_uuid}&engine=${SBC_ENGINE}" -H "Content-Type: application/json" -H "Authorization: Bearer ${api_token}" -H "X-SBC-Engine: ${SBC_ENGINE}" --data "{\"engine\":\"${SBC_ENGINE}\"}" 2>>"${LOG_FILE}")"
+  http_code="$(curl -sS -o "${response_file}" -w "%{http_code}" --connect-timeout "${HTTP_CONNECT_TIMEOUT_SECONDS}" --max-time "${HTTP_MAX_TIME_SECONDS}" -X POST "${api_base}/api/v1/sbc/runtime/config?node_uuid=${node_uuid}&engine=${SBC_ENGINE}" -H "Content-Type: application/json" -H "Authorization: Bearer ${api_token}" -H "X-SBC-Engine: ${SBC_ENGINE}" --data "{\"engine\":\"${SBC_ENGINE}\"}" 2>>"${LOG_FILE}")"
   if [[ "$http_code" != "200" ]]; then
     warn "SBC runtime config response: $(tr -d '\n\r' < "$response_file" | cut -c1-500)"
     rm -f "$response_file"

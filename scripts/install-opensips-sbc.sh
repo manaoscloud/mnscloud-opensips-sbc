@@ -20,6 +20,8 @@ SBC_ENGINE="${MNSCLOUD_SBC_ENGINE:-opensips}"
 NODE_UUID="${MNSCLOUD_SBC_NODE_UUID:-}"
 API_BASE=""
 API_TOKEN="${MNSCLOUD_SBC_API_TOKEN:-}"
+HTTP_CONNECT_TIMEOUT_SECONDS="${MNSCLOUD_SBC_HTTP_CONNECT_TIMEOUT:-5}"
+HTTP_MAX_TIME_SECONDS="${MNSCLOUD_SBC_HTTP_MAX_TIME:-60}"
 MEDIA_SOCKET=""
 OPENSIPS_RUNTIME_KIT_DIR="${OPENSIPS_RUNTIME_KIT_DIR:-/opt/mnscloud/runtime-kit}"
 OPENSIPS_RUNTIME_KIT_REPO_URL="${OPENSIPS_RUNTIME_KIT_REPO_URL:-https://github.com/manaoscloud/mnscloud-runtime-kit.git}"
@@ -269,7 +271,7 @@ bootstrap_node_via_api() {
     return 0
   fi
   response_file="$(mktemp)"
-  http_code="$(curl -sS -o "${response_file}" -w "%{http_code}" -X POST "${API_BASE}/api/v1/sbc/runtime/bootstrap?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}" -H "Content-Type: application/json" -H "Authorization: Bearer ${API_TOKEN}" -H "X-SBC-Engine: ${SBC_ENGINE}" --data "${payload}" 2>>"${LOG_FILE}")"
+  http_code="$(curl -sS -o "${response_file}" -w "%{http_code}" --connect-timeout "${HTTP_CONNECT_TIMEOUT_SECONDS}" --max-time "${HTTP_MAX_TIME_SECONDS}" -X POST "${API_BASE}/api/v1/sbc/runtime/bootstrap?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}" -H "Content-Type: application/json" -H "Authorization: Bearer ${API_TOKEN}" -H "X-SBC-Engine: ${SBC_ENGINE}" --data "${payload}" 2>>"${LOG_FILE}")"
   server_uuid="$(json_field "serverUUID" "${response_file}")"
   if [[ "${http_code}" == "200" ]]; then
     media_socket="$(json_field "rtpengineSocket" "${response_file}")"
