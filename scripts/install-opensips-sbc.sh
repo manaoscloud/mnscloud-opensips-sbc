@@ -56,6 +56,10 @@ refresh_agent_capabilities() {
     log DRY "refresh mnscloud-agent capabilities so it publishes voip.sbc.manage"
     return 0
   fi
+  if [[ "${MNSCLOUD_REFRESH_AGENT_CAPABILITIES:-1}" == "0" ]]; then
+    ok "Skipping mnscloud-agent capability refresh by request"
+    return 0
+  fi
 
   if [[ -x "${AGENT_REPO_INSTALLER}" ]]; then
     info "Refreshing mnscloud-agent capabilities after SBC runtime install."

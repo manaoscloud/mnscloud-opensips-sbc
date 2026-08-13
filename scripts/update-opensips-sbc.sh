@@ -43,5 +43,5 @@ cd "$ROOT_DIR"
 git fetch --all --tags --prune
 git -c advice.detachedHead=false checkout "$REF"
 
-bash "${SCRIPT_DIR}/install-opensips-sbc.sh" "${ARGS[@]}"
+MNSCLOUD_REFRESH_AGENT_CAPABILITIES=0 bash "${SCRIPT_DIR}/install-opensips-sbc.sh" "${ARGS[@]}"
 bash "${SCRIPT_DIR}/validate-opensips-sbc.sh"
