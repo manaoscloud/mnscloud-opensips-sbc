@@ -232,6 +232,9 @@ See `opensips.md` and `SECURITY.md` for details.
   `db_text` database generated from the authenticated runtime config endpoint. The local table is
   an OpenSIPS module requirement; changes are applied at runtime through MI `reg_reload`, not by
   reinstalling the SBC.
+- After the Agent-backed runtime sync/reload, the connector queries OpenSIPS MI `reg_list` and
+  publishes each REGISTER peer status back to `/api/v1/sbc/runtime/peer-status`, so the control
+  plane shows the actual OpenSIPS registration state instead of stale `pending` metadata.
 - SIP-I/SIP-T is represented by peer/pipe signaling profiles. OpenSIPS 3.6 uses the official
   `sip_i.so` module when available from the installed package. If the module is absent, the
   installer warns and keeps SIP-I payload interworking disabled instead of generating a broken
