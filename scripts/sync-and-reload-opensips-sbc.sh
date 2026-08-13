@@ -233,6 +233,7 @@ main() {
   if [[ "$DRY_RUN" == true ]]; then
     log DRY "bash '${SCRIPT_DIR}/sync-opensips-sbc-runtime.sh' --dry-run"
     log DRY "reload uac_registrant through OpenSIPS MI only when registrants changed"
+    log DRY "report REGISTER peer status through /api/v1/sbc/runtime/peer-status"
     return 0
   fi
 
@@ -249,6 +250,7 @@ main() {
   media_after="$(file_checksum "${MEDIA_SOCKET_FILE}")"
   reload_registrants_if_changed "${registrant_before}" "${registrant_after}" "${registrant_before_file}" "${DBTEXT_DIR}/registrant"
   restart_when_static_runtime_changed "${media_before}" "${media_after}"
+  bash "${SCRIPT_DIR}/report-opensips-sbc-peer-status.sh"
 }
 
 main "$@"
