@@ -222,7 +222,7 @@ See `opensips.md` and `SECURITY.md` for details.
   `rtpengine` when the API assigns a media relay to this SBC server.
 - Codec policy is represented in SBC pipes and must remain API/control-plane driven; the
   connector applies only the runtime instructions returned by the API contract.
-- Peer authentication supports the control-plane modes `ip`, `register`, `ip_digest`, and `none`.
+- Peer authentication supports the control-plane modes `ip`, `register`, and `none`.
   IP authentication must be backed by explicit allowed source addresses. REGISTER peers should also
   define allowed source addresses for inbound calls when the carrier sends INVITEs without
   Authorization, otherwise pipe lookup fails closed. REGISTER and OPTIONS status must be reported
