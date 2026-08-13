@@ -127,8 +127,6 @@ O instalador:
   `VspAllowedSourceAddresses` preenchido com os IPs autorizados da operadora quando o match não
   puder ser feito por usuário de autenticação. Como o módulo oficial mantém esses registros em
   memória, alterações são aplicadas em runtime via MI `reg_reload`.
-- `ip_digest`: reservado para operadoras que exigem IP fixo mais desafio digest em chamadas
-  originadas; a política fica no control plane e deve ser tratada como caso explícito.
 - `none`: somente para cenários internos controlados, nunca como padrão de operadora externa.
 
 O estado de registro e health deve ser reportado para `/api/v1/sbc/runtime/peer-status`. O
