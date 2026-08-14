@@ -21,11 +21,11 @@ Este diretório documenta o uso do OpenSIPS como SBC do mnscloud.
 - `VoipSbcServer.RealtimeMediaServerRmsUUID`: servidor `mnscloud-media` usado para ancorar RTP/SRTP quando necessário.
 - `VoipSbcAccount`: conta SBC do tenant associada a um servidor SBC master.
 - `VoipSbcInterface`: listeners/sockets SIP locais do servidor SBC, controlados pelo master.
-- `VoipSbcPeer`: identidade de interconexão SIP inbound, com autenticação, registro, origem
-  autorizada, SIP-I/SIP-T, limites e monitoramento.
-- `VoipSbcPipe`: fluxo tenant-aware que liga Inbound a Outbound,
-  mantendo host, porta, transporte, failover, interface, critérios opcionais, mídia, codecs e
-  comportamento operacional.
+- `VoipSbcPeer`: identidade de interconexão SIP de origem ou destino, com autenticação, registro,
+  origem autorizada, destino SIP, SIP-I/SIP-T, limites e monitoramento.
+- `VoipSbcPipe`: fluxo tenant-aware que liga um peer de origem a um destino. O destino padrão é um
+  `VoipSbcPeer` reutilizável; host/porta/transporte manual ficam reservados para cenários
+  avançados ou one-off.
 - `VoipSbcManipulation`: manipulações SIP vinculadas ao pipe.
 
 ## Endpoints Runtime
@@ -42,13 +42,15 @@ O `node_uuid` pode ir via query string ou header `X-SBC-Node-UUID`. O token é g
 pelo instalador, enviado como `Authorization: Bearer <token>` no bootstrap e nas
 consultas runtime, e somente o hash fica salvo no banco.
 
-O lookup de `pipe` envia contexto SIP suficiente para identificar o Inbound e selecionar o
-fluxo multi-tenant correto: direção, destino/RURI, IP/porta/transporte de origem, IP/porta local,
-From, To, R-URI domain e usuário de autenticação quando disponível. A API/control plane primeiro
-resolve a interconexão de entrada (`inputPeerUUID`) e depois escolhe um único `VoipSbcPipe`
-ativo para o par `Inbound -> Outbound`. Critérios como IP, porta, domínio, From/To e
-destino são refinadores de match, não a identidade principal do fluxo. Empates são tratados como
-ambiguidade e a chamada não deve ser encaminhada automaticamente.
+O lookup de `pipe` envia contexto SIP suficiente para identificar a origem e selecionar o fluxo
+multi-tenant correto: direção, destino/RURI, IP/porta/transporte de origem, IP/porta local, From,
+To, R-URI domain e usuário de autenticação quando disponível. A API/control plane primeiro resolve
+a interconexão de origem (`inputPeerUUID`) e depois escolhe um único `VoipSbcPipe` ativo para o
+par `Origem -> Destino`. Quando `destinationMode=peer`, o destino é resolvido pelo
+`outputPeerUUID`; quando `destinationMode=manual`, o destino usa host/porta/transporte gravados no
+Pipe. Critérios como IP, porta, domínio, From/To e destino são refinadores de match, não a
+identidade principal do fluxo. Empates são tratados como ambiguidade e a chamada não deve ser
+encaminhada automaticamente.
 
 O endpoint `runtime/config` é exclusivo do runtime autenticado do SBC. Ele entrega a configuração
 ativa de interfaces, peers e pipes para o servidor autorizado, incluindo credenciais necessárias
