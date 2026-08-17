@@ -60,6 +60,11 @@ is installed or updated.
   inbound peer to a direct outbound SIP destination with host, port, transport and failover. Peer
   authentication, registration, IP allowlists, SIP-I/SIP-T interworking, media policy, and codec
   policy are API/control-plane records consumed by this connector at runtime.
+- Inbound pipe selection is fail-closed by DID ownership. The destination number must be an active
+  platform DID assigned to the tenant or an active validated external DID owned by the tenant.
+  Available, reserved, removed, unvalidated, or other-tenant DIDs do not select a pipe. Outbound
+  calls do not use DID ownership for the dialed destination; outbound policy is handled by route,
+  billing, caller ID, and manipulation controls.
 - SIP firewall rules opened according to the deployment model, typically `5060/udp` and `5060/tcp`.
 
 ## Install

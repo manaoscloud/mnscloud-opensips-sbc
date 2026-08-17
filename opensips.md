@@ -52,6 +52,13 @@ Pipe. Critérios como IP, porta, domínio, From/To e destino são refinadores de
 identidade principal do fluxo. Empates são tratados como ambiguidade e a chamada não deve ser
 encaminhada automaticamente.
 
+Para chamadas entrantes (`direction=inbound`), o lookup do pipe também valida o DID de destino como
+fronteira de tenant. O pipe só é selecionado quando o número existe como DID ativo atribuído ao
+tenant (`VoipDidAssignment`) ou como DID externo ativo do próprio tenant. Números disponíveis,
+reservados, removidos, não validados ou atribuídos a outro tenant falham fechados e não selecionam
+pipe. Em chamadas saintes (`direction=outbound`), o destino discado não é tratado como DID
+contratado; permissões, billing, caller ID e manipulação pertencem às políticas de saída.
+
 O endpoint `runtime/config` é exclusivo do runtime autenticado do SBC. Ele entrega a configuração
 ativa de interfaces, peers e pipes para o servidor autorizado, incluindo credenciais necessárias
 para `REGISTER` ativo. Essas credenciais não são expostas ao app tenant e ficam gravadas localmente
