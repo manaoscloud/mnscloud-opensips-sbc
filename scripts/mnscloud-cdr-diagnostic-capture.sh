@@ -3,11 +3,11 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'USAGE'
-Usage: mnscloud-cdr-diagnostic-capture.sh --enabled yes --module sbc --engine opensips --resource-type sbc_cdr --resource-uuid <id> --call-id <call-id> [--interface any] [--duration 60] [--filter "port 5060"]
+Usage: mnscloud-cdr-diagnostic-capture.sh --enabled yes --module sbc --engine opensips --resource-type sbc_cdr --resource-uuid <id> --call-id <call-id> [--mode sip_capture|pcapng] [--interface any] [--duration 60] [--filter "port 5060"]
 
-Captures a temporary PCAPNG diagnostic artifact, uploads it through a short-lived MNSCloud API
-storage URL and registers only metadata in the CDR diagnostic attachment table. Default is
-fail-closed: nothing is captured unless --enabled yes is provided.
+Captures a temporary SIP text or PCAPNG diagnostic artifact, uploads it through a short-lived
+MNSCloud API storage URL and registers only metadata in the CDR diagnostic attachment table.
+Default is fail-closed: nothing is captured unless --enabled yes is provided.
 USAGE
 }
 
@@ -17,6 +17,7 @@ engine="opensips"
 resource_type="sbc_cdr"
 resource_uuid=""
 call_id=""
+mode="sip_capture"
 iface="any"
 duration="60"
 filter_expr="port 5060"
@@ -29,6 +30,7 @@ while [[ $# -gt 0 ]]; do
     --resource-type) resource_type="${2:-}"; shift 2 ;;
     --resource-uuid) resource_uuid="${2:-}"; shift 2 ;;
     --call-id) call_id="${2:-}"; shift 2 ;;
+    --mode) mode="${2:-}"; shift 2 ;;
     --interface) iface="${2:-}"; shift 2 ;;
     --duration) duration="${2:-}"; shift 2 ;;
     --filter) filter_expr="${2:-}"; shift 2 ;;
@@ -39,10 +41,16 @@ done
 
 [[ "$enabled" == "yes" ]] || { echo "Diagnostic capture disabled."; exit 0; }
 [[ -n "$resource_uuid" && -n "$call_id" ]] || { echo "resource uuid and call id are required." >&2; exit 64; }
-[[ "$duration" =~ ^[0-9]+$ && "$duration" -ge 1 && "$duration" -le 300 ]] || { echo "duration must be 1..300 seconds." >&2; exit 64; }
+mode="$(tr '[:upper:]' '[:lower:]' <<<"$mode")"
+[[ "$mode" == "sip_capture" || "$mode" == "pcapng" ]] || { echo "mode must be sip_capture or pcapng." >&2; exit 64; }
+[[ "$duration" =~ ^[0-9]+$ && "$duration" -ge 10 && "$duration" -le 300 ]] || { echo "duration must be 10..300 seconds." >&2; exit 64; }
 command -v jq >/dev/null || { echo "jq is required." >&2; exit 69; }
 command -v curl >/dev/null || { echo "curl is required." >&2; exit 69; }
-command -v dumpcap >/dev/null || { echo "dumpcap is required for pcapng capture." >&2; exit 69; }
+if [[ "$mode" == "pcapng" ]]; then
+  command -v dumpcap >/dev/null || { echo "dumpcap is required for pcapng capture." >&2; exit 69; }
+else
+  command -v tcpdump >/dev/null || { echo "tcpdump is required for sip_capture." >&2; exit 69; }
+fi
 
 api_base="${MNSCLOUD_API_BASE:-}"
 api_token="${MNSCLOUD_API_TOKEN:-}"
@@ -51,18 +59,29 @@ api_token="${MNSCLOUD_API_TOKEN:-}"
 tmp_dir="$(mktemp -d)"
 cleanup() { rm -rf "$tmp_dir"; }
 trap cleanup EXIT
-pcap="$tmp_dir/cdr-diagnostic.pcapng"
 
-timeout "$duration" dumpcap -q -i "$iface" -f "$filter_expr" -w "$pcap" >/dev/null 2>&1 || true
-[[ -s "$pcap" ]] || { echo "No packets captured." >&2; exit 75; }
+if [[ "$mode" == "pcapng" ]]; then
+  artifact="$tmp_dir/cdr-diagnostic.pcapng"
+  filename="cdr-diagnostic.pcapng"
+  content_type="application/vnd.tcpdump.pcap"
+  timeout "$duration" dumpcap -q -i "$iface" -f "$filter_expr" -w "$artifact" >/dev/null 2>&1 || true
+  contains_payload="true"
+else
+  artifact="$tmp_dir/cdr-diagnostic.sip"
+  filename="cdr-diagnostic.sip"
+  content_type="text/plain; charset=utf-8"
+  timeout "$duration" tcpdump -A -s 0 -n -i "$iface" "$filter_expr" >"$artifact" 2>/dev/null || true
+  contains_payload="false"
+fi
+[[ -s "$artifact" ]] || { echo "No packets captured." >&2; exit 75; }
 
-size_bytes="$(stat -c '%s' "$pcap")"
-checksum="$(sha256sum "$pcap" | awk '{print $1}')"
+size_bytes="$(stat -c '%s' "$artifact")"
+checksum="$(sha256sum "$artifact" | awk '{print $1}')"
 
 prepare_payload="$(jq -n \
   --arg module "$module" --arg engine "$engine" --arg resourceType "$resource_type" \
-  --arg resourceUUID "$resource_uuid" --arg diagnosticType "pcapng" \
-  '{module:$module,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,diagnosticType:$diagnosticType,contentType:"application/vnd.tcpdump.pcap"}')"
+  --arg resourceUUID "$resource_uuid" --arg diagnosticType "$mode" --arg contentType "$content_type" \
+  '{module:$module,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,diagnosticType:$diagnosticType,contentType:$contentType}')"
 
 prepare_response="$(curl -fsS -X POST "${api_base%/}/api/v1/voip/cdr-diagnostics/upload-url" \
   -H "Authorization: Bearer $api_token" -H "Content-Type: application/json" --data "$prepare_payload")"
@@ -71,13 +90,15 @@ storage_key="$(jq -r '.data.key // empty' <<<"$prepare_response")"
 storage_account_uuid="$(jq -r '.data.storageAccountUUID // empty' <<<"$prepare_response")"
 [[ -n "$upload_url" && -n "$storage_key" ]] || { echo "API did not return upload URL." >&2; exit 75; }
 
-curl -fsS -X PUT "$upload_url" -H "Content-Type: application/vnd.tcpdump.pcap" --data-binary "@$pcap" >/dev/null
+curl -fsS -X PUT "$upload_url" -H "Content-Type: $content_type" --data-binary "@$artifact" >/dev/null
 
 register_payload="$(jq -n \
   --arg module "$module" --arg engine "$engine" --arg resourceType "$resource_type" \
   --arg resourceUUID "$resource_uuid" --arg callID "$call_id" --arg storageAccountUUID "$storage_account_uuid" \
-  --arg storageObjectKey "$storage_key" --arg checksumSha256 "$checksum" --argjson sizeBytes "$size_bytes" \
-  '{module:$module,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,callID:$callID,diagnosticType:"pcapng",captureMode:"pcapng",storageMode:"storage",storageAccountUUID:$storageAccountUUID,storageObjectKey:$storageObjectKey,originalFilename:"cdr-diagnostic.pcapng",contentType:"application/vnd.tcpdump.pcap",sizeBytes:$sizeBytes,checksumSha256:$checksumSha256,sanitized:false,containsSdp:true,containsPayload:true,status:"available"}')"
+  --arg storageObjectKey "$storage_key" --arg checksumSha256 "$checksum" --arg diagnosticType "$mode" \
+  --arg captureMode "$mode" --arg originalFilename "$filename" --arg contentType "$content_type" \
+  --argjson sizeBytes "$size_bytes" --argjson containsPayload "$contains_payload" \
+  '{module:$module,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,callID:$callID,diagnosticType:$diagnosticType,captureMode:$captureMode,storageMode:"storage",storageAccountUUID:$storageAccountUUID,storageObjectKey:$storageObjectKey,originalFilename:$originalFilename,contentType:$contentType,sizeBytes:$sizeBytes,checksumSha256:$checksumSha256,sanitized:false,containsSdp:true,containsPayload:$containsPayload,status:"available"}')"
 
 curl -fsS -X POST "${api_base%/}/api/v1/voip/cdr-diagnostics" \
   -H "Authorization: Bearer $api_token" -H "Content-Type: application/json" --data "$register_payload"
