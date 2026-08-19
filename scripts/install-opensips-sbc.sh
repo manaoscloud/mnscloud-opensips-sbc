@@ -617,7 +617,7 @@ ${record_route_block}
           if (\$var(diag_mode) == NULL || \$var(diag_mode) == \"\") { \$var(diag_mode) = \"sip_capture\"; }
           \$var(diag_seconds) = \$json(pipe/codecPolicy/diagnosticCaptureSeconds);
           if (\$var(diag_seconds) == NULL || \$var(diag_seconds) == \"\") { \$var(diag_seconds) = \"60\"; }
-          exec(\"/bin/sh -c 'MNSCLOUD_API_BASE=\\\"${API_BASE}\\\" MNSCLOUD_API_TOKEN=\\\"${API_TOKEN}\\\" MNSCLOUD_NODE_UUID=\\\"${NODE_UUID}\\\" /opt/mnscloud/mnscloud-opensips-sbc/scripts/mnscloud-cdr-diagnostic-capture.sh --enabled yes --module sbc --engine ${SBC_ENGINE} --resource-type sbc_cdr --resource-uuid \\\"$var(cdr_uuid)\\\" --call-id \\\"$ci\\\" --mode \\\"$var(diag_mode)\\\" --duration \\\"$var(diag_seconds)\\\" --filter \\\"port 5060\\\" >>${capture_log_dir}/cdr-diagnostic-capture.log 2>&1 &' \");
+          exec(\"/bin/sh -c 'MNSCLOUD_API_BASE=\\\"${API_BASE}\\\" MNSCLOUD_API_TOKEN=\\\"${API_TOKEN}\\\" MNSCLOUD_NODE_UUID=\\\"${NODE_UUID}\\\" /opt/mnscloud/mnscloud-opensips-sbc/scripts/mnscloud-cdr-diagnostic-capture.sh --enabled yes --module sbc --engine ${SBC_ENGINE} --resource-type sbc_cdr --resource-uuid \\\"\$var(cdr_uuid)\\\" --call-id \\\"\$ci\\\" --mode \\\"\$var(diag_mode)\\\" --duration \\\"\$var(diag_seconds)\\\" --filter \\\"port 5060\\\" >>${capture_log_dir}/cdr-diagnostic-capture.log 2>&1 &' \");
         }
       }
     }
