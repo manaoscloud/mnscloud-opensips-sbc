@@ -54,7 +54,8 @@ fi
 
 api_base="${MNSCLOUD_API_BASE:-}"
 api_token="${MNSCLOUD_API_TOKEN:-}"
-[[ -n "$api_base" && -n "$api_token" ]] || { echo "MNSCLOUD_API_BASE and MNSCLOUD_API_TOKEN are required." >&2; exit 78; }
+node_uuid="${MNSCLOUD_NODE_UUID:-}"
+[[ -n "$api_base" && -n "$api_token" && -n "$node_uuid" ]] || { echo "MNSCLOUD_API_BASE, MNSCLOUD_API_TOKEN and MNSCLOUD_NODE_UUID are required." >&2; exit 78; }
 
 tmp_dir="$(mktemp -d)"
 cleanup() { rm -rf "$tmp_dir"; }
@@ -77,14 +78,17 @@ fi
 
 size_bytes="$(stat -c '%s' "$artifact")"
 checksum="$(sha256sum "$artifact" | awk '{print $1}')"
+capture_mode="$mode"
+[[ "$capture_mode" == "sip_capture" ]] && capture_mode="full"
 
 prepare_payload="$(jq -n \
-  --arg module "$module" --arg engine "$engine" --arg resourceType "$resource_type" \
+  --arg diagnosticModule "$module" --arg engine "$engine" --arg resourceType "$resource_type" \
   --arg resourceUUID "$resource_uuid" --arg diagnosticType "$mode" --arg contentType "$content_type" \
-  '{module:$module,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,diagnosticType:$diagnosticType,contentType:$contentType}')"
+  '{module:$diagnosticModule,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,diagnosticType:$diagnosticType,contentType:$contentType}')"
 
-prepare_response="$(curl -fsS -X POST "${api_base%/}/api/v1/voip/cdr-diagnostics/upload-url" \
-  -H "Authorization: Bearer $api_token" -H "Content-Type: application/json" --data "$prepare_payload")"
+runtime_query="node_uuid=${node_uuid}&engine=${engine}"
+prepare_response="$(curl -fsS -X POST "${api_base%/}/api/v1/voip/cdr-diagnostics/runtime/upload-url?${runtime_query}" \
+  -H "Authorization: Bearer $api_token" -H "Content-Type: application/json" -H "X-MNSCloud-Node-UUID: $node_uuid" --data "$prepare_payload")"
 upload_url="$(jq -r '.data.uploadUrl // empty' <<<"$prepare_response")"
 storage_key="$(jq -r '.data.key // empty' <<<"$prepare_response")"
 storage_account_uuid="$(jq -r '.data.storageAccountUUID // empty' <<<"$prepare_response")"
@@ -93,12 +97,12 @@ storage_account_uuid="$(jq -r '.data.storageAccountUUID // empty' <<<"$prepare_r
 curl -fsS -X PUT "$upload_url" -H "Content-Type: $content_type" --data-binary "@$artifact" >/dev/null
 
 register_payload="$(jq -n \
-  --arg module "$module" --arg engine "$engine" --arg resourceType "$resource_type" \
+  --arg diagnosticModule "$module" --arg engine "$engine" --arg resourceType "$resource_type" \
   --arg resourceUUID "$resource_uuid" --arg callID "$call_id" --arg storageAccountUUID "$storage_account_uuid" \
   --arg storageObjectKey "$storage_key" --arg checksumSha256 "$checksum" --arg diagnosticType "$mode" \
-  --arg captureMode "$mode" --arg originalFilename "$filename" --arg contentType "$content_type" \
+  --arg captureMode "$capture_mode" --arg originalFilename "$filename" --arg contentType "$content_type" \
   --argjson sizeBytes "$size_bytes" --argjson containsPayload "$contains_payload" \
-  '{module:$module,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,callID:$callID,diagnosticType:$diagnosticType,captureMode:$captureMode,storageMode:"storage",storageAccountUUID:$storageAccountUUID,storageObjectKey:$storageObjectKey,originalFilename:$originalFilename,contentType:$contentType,sizeBytes:$sizeBytes,checksumSha256:$checksumSha256,sanitized:false,containsSdp:true,containsPayload:$containsPayload,status:"available"}')"
+  '{module:$diagnosticModule,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,callID:$callID,diagnosticType:$diagnosticType,captureMode:$captureMode,storageMode:"storage",storageAccountUUID:$storageAccountUUID,storageObjectKey:$storageObjectKey,originalFilename:$originalFilename,contentType:$contentType,sizeBytes:$sizeBytes,checksumSha256:$checksumSha256,sanitized:false,containsSdp:true,containsPayload:$containsPayload,status:"available"}')"
 
-curl -fsS -X POST "${api_base%/}/api/v1/voip/cdr-diagnostics" \
-  -H "Authorization: Bearer $api_token" -H "Content-Type: application/json" --data "$register_payload"
+curl -fsS -X POST "${api_base%/}/api/v1/voip/cdr-diagnostics/runtime?${runtime_query}" \
+  -H "Authorization: Bearer $api_token" -H "Content-Type: application/json" -H "X-MNSCloud-Node-UUID: $node_uuid" --data "$register_payload"
