@@ -504,9 +504,35 @@ ${rtpengine_bye}
     exit;
   }
 
-  if (has_totag() && is_method(\"ACK\")) {
-    xlog(\"L_WARN\", \"mnscloud SBC dropping in-dialog ACK without Route for \$ci from \$si to \$ru route=\$hdr(Route) contact=\$hdr(Contact); expected Record-Route/Route set\\n\");
-    if (t_check_trans()) { t_relay(); }
+  if (has_totag() && is_method(\"ACK|BYE\")) {
+    xlog(\"L_WARN\", \"mnscloud SBC in-dialog \$rm without Route for \$ci from \$si to \$ru route=\$hdr(Route); using authorized pipe fallback\\n\");
+    \$var(pipe_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"direction\\\":\\\"inbound\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"auth_username\\\":\\\"\" + \$au + \"\\\"}\";
+    rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+    rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+    \$var(rest_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/pipe?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(pipe_payload), \"application/json\", \$var(body), \$var(ct), \$var(http_code));
+    if (\$var(rest_rc) < 0 || \$var(http_code) != 200) {
+      xlog(\"L_WARN\", \"mnscloud SBC in-dialog fallback pipe lookup failed for \$ci method=\$rm rc=\$var(rest_rc) http=\$var(http_code)\\n\");
+      if (is_method(\"ACK\") && t_check_trans()) { t_relay(); }
+      exit;
+    }
+    \$json(pipe) := \$var(body);
+    if (\$json(pipe/allowed) != \"true\" || \$json(pipe/host) == NULL || \$json(pipe/port) == NULL) {
+      xlog(\"L_WARN\", \"mnscloud SBC in-dialog fallback denied for \$ci method=\$rm body=\$var(body)\\n\");
+      if (is_method(\"ACK\") && t_check_trans()) { t_relay(); }
+      exit;
+    }
+    \$var(dst_transport) = \$json(pipe/transport);
+    if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
+    \$du = \"sip:\" + \$json(pipe/host) + \":\" + \$json(pipe/port) + \";transport=\" + \$var(dst_transport);
+    if (is_method(\"BYE\")) {
+      \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"bye\\\",\\\"direction\\\":\\\"\" + \$json(pipe/direction) + \"\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$json(pipe/pipeUUID) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$json(pipe/inputPeerUUID) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$json(pipe/host) + \"\\\",\\\"output_port\\\":\" + \$json(pipe/port) + \",\\\"output_transport\\\":\\\"\" + \$var(dst_transport) + \"\\\"}\";
+      rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+      rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+      \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
+      if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC fallback BYE accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
+${rtpengine_bye}
+    }
+    if (!t_relay()) { if (!is_method(\"ACK\")) { sl_send_reply(500, \"Relay failed\"); } }
     exit;
   }
 
