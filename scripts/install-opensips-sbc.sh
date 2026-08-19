@@ -398,7 +398,7 @@ opensips_module_path() {
 }
 
 write_opensips_config() {
-  local cfg="/etc/opensips/opensips.cfg" module_path advertised_ip private_ip record_route_block sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply_body=""
+  local cfg="/etc/opensips/opensips.cfg" module_path advertised_ip private_ip record_route_block sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply_body="" exec_modules="" capture_log_dir="/var/log/mnscloud/opensips"
   module_path="$(opensips_module_path)"
   advertised_ip="$(opensips_advertised_ipv4)"
   private_ip="$(private_ipv4)"
@@ -416,6 +416,12 @@ write_opensips_config() {
     sip_i_modules='loadmodule "sip_i.so"'
   else
     warn "OpenSIPS sip_i module not found at ${module_path%/}/sip_i.so; SIP-I payload interworking will stay disabled until the package provides it"
+  fi
+  if [[ -r "${module_path%/}/exec.so" ]]; then
+    exec_modules='loadmodule "exec.so"'
+    run "install -d -m 0750 '${capture_log_dir}'"
+  else
+    warn "OpenSIPS exec module not found at ${module_path%/}/exec.so; automatic CDR diagnostic capture will stay disabled"
   fi
   if [[ -r "${module_path%/}/db_text.so" && -r "${module_path%/}/uac.so" && -r "${module_path%/}/uac_auth.so" && -r "${module_path%/}/uac_registrant.so" && -r "${module_path%/}/mi_fifo.so" ]]; then
     uac_modules='loadmodule "db_text.so"
@@ -480,6 +486,7 @@ loadmodule \"textops.so\"
 loadmodule \"sipmsgops.so\"
 loadmodule \"rest_client.so\"
 loadmodule \"json.so\"
+${exec_modules}
 ${sip_i_modules}
 ${uac_modules}
 ${rtpengine_modules}
@@ -601,6 +608,18 @@ ${record_route_block}
       rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
       \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
       if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
+      if (\$var(cdr_rc) >= 0 && \$var(cdr_http_code) == 200 &&
+          (\$json(pipe/codecPolicy/diagnosticCaptureEnabled) == 1 || \$json(pipe/codecPolicy/diagnosticCaptureEnabled) == \"1\" || \$json(pipe/codecPolicy/diagnosticCaptureEnabled) == \"true\")) {
+        \$json(cdr_response) := \$var(cdr_body);
+        \$var(cdr_uuid) = \$json(cdr_response/data/cdrUUID);
+        if (\$var(cdr_uuid) != NULL && \$var(cdr_uuid) != \"\") {
+          \$var(diag_mode) = \$json(pipe/codecPolicy/diagnosticCaptureMode);
+          if (\$var(diag_mode) == NULL || \$var(diag_mode) == \"\") { \$var(diag_mode) = \"sip_capture\"; }
+          \$var(diag_seconds) = \$json(pipe/codecPolicy/diagnosticCaptureSeconds);
+          if (\$var(diag_seconds) == NULL || \$var(diag_seconds) == \"\") { \$var(diag_seconds) = \"60\"; }
+          exec(\"/bin/sh -c 'MNSCLOUD_API_BASE=\\\"${API_BASE}\\\" MNSCLOUD_API_TOKEN=\\\"${API_TOKEN}\\\" MNSCLOUD_NODE_UUID=\\\"${NODE_UUID}\\\" /opt/mnscloud/mnscloud-opensips-sbc/scripts/mnscloud-cdr-diagnostic-capture.sh --enabled yes --module sbc --engine ${SBC_ENGINE} --resource-type sbc_cdr --resource-uuid \\\"$var(cdr_uuid)\\\" --call-id \\\"$ci\\\" --mode \\\"$var(diag_mode)\\\" --duration \\\"$var(diag_seconds)\\\" --filter \\\"port 5060\\\" >>${capture_log_dir}/cdr-diagnostic-capture.log 2>&1 &' \");
+        }
+      }
     }
     t_on_reply(\"MNSCLOUD_REPLY\");
 ${rtpengine_offer}
