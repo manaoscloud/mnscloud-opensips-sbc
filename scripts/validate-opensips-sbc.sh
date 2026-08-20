@@ -23,6 +23,14 @@ grep -Fq 'record_route_preset(\"${advertised_ip}:5060\", \"${private_ip}:5060\")
   echo "[validate-opensips-sbc] installer must keep dual Record-Route for private/public paths" >&2
   exit 1
 }
+grep -Fq 'has_totag() && is_method(\"ACK|BYE\")' "$installer" || {
+  echo "[validate-opensips-sbc] installer must route in-dialog ACK and BYE through dialog lookup before pipe fallback" >&2
+  exit 1
+}
+grep -Fq 'mnscloud SBC in-dialog \$rm dialog route' "$installer" || {
+  echo "[validate-opensips-sbc] installer must log in-dialog ACK/BYE dialog routing decisions" >&2
+  exit 1
+}
 
 if command -v opensips >/dev/null 2>&1 && [[ -r "$OPENSIPS_CFG" ]]; then
   echo "[validate-opensips-sbc] checking ${OPENSIPS_CFG}"
