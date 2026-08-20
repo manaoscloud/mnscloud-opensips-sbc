@@ -241,6 +241,16 @@ if [[ "$packet_capture_available" != "yes" ]]; then
     echo "# requested_mode=${mode}"
     echo "# install tcpdump for sip_capture or dumpcap for pcapng on this runtime"
   } >"$artifact"
+elif [[ ! -s "$artifact" && "$mode" == "sip_capture" ]]; then
+  {
+    echo "# MNSCloud SIP packet capture completed with no packets"
+    echo "# requested_mode=${mode}"
+    echo "# interface=${iface}"
+    echo "# filter=${filter_expr}"
+    echo "# duration_seconds=${duration}"
+    echo "# captured_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "# This diagnostic is intentionally stored so the CDR keeps evidence that capture was active."
+  } >"$artifact"
 fi
 capture_mode="$mode"
 [[ "$capture_mode" == "sip_capture" ]] && capture_mode="full"
