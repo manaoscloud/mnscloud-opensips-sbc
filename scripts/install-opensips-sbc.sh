@@ -526,7 +526,7 @@ ${rtpengine_bye}
       \$var(dialog_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/dialog?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(dialog_payload), \"application/json\", \$var(dialog_body), \$var(dialog_ct), \$var(dialog_http_code));
       if (\$var(dialog_rc) >= 0 && \$var(dialog_http_code) == 200) {
         \$json(dialog) := \$var(dialog_body);
-        if (\$json(dialog/allowed) == \"true\" && \$json(dialog/host) != NULL && \$json(dialog/port) != NULL) {
+        if ((\$json(dialog/allowed) == \"true\" || \$json(dialog/allowed) == 1 || \$json(dialog/allowed) == \"1\") && \$json(dialog/host) != NULL && \$json(dialog/port) != NULL) {
           \$var(dst_transport) = \$json(dialog/transport);
           if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
           \$du = \"sip:\" + \$json(dialog/host) + \":\" + \$json(dialog/port) + \";transport=\" + \$var(dst_transport);
