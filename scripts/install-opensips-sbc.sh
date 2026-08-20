@@ -419,7 +419,7 @@ write_opensips_config() {
   fi
   if [[ -r "${module_path%/}/exec.so" ]]; then
     exec_modules='loadmodule "exec.so"'
-    run "install -d -m 0750 '${capture_log_dir}'"
+    run "install -d -o root -g '$(opensips_group)' -m 0770 '${capture_log_dir}'"
   else
     warn "OpenSIPS exec module not found at ${module_path%/}/exec.so; automatic CDR diagnostic capture will stay disabled"
   fi
