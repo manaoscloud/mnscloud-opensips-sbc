@@ -14,6 +14,16 @@ bash -n "$(dirname "$0")/update-opensips-sbc.sh"
 bash -n "$(dirname "$0")/update-latest-opensips-sbc.sh"
 bash -n "$(dirname "$0")/rollback-opensips-sbc.sh"
 
+installer="$(dirname "$0")/install-opensips-sbc.sh"
+grep -Fq 'socket=udp:${private_ip}:5060 as ${advertised_ip}:5060' "$installer" || {
+  echo "[validate-opensips-sbc] installer must bind the private socket when advertising a public address" >&2
+  exit 1
+}
+grep -Fq 'record_route_preset(\"${advertised_ip}:5060\", \"${private_ip}:5060\")' "$installer" || {
+  echo "[validate-opensips-sbc] installer must keep dual Record-Route for private/public paths" >&2
+  exit 1
+}
+
 if command -v opensips >/dev/null 2>&1 && [[ -r "$OPENSIPS_CFG" ]]; then
   echo "[validate-opensips-sbc] checking ${OPENSIPS_CFG}"
   opensips -C -f "$OPENSIPS_CFG"
