@@ -259,6 +259,21 @@ runtime_query="node_uuid=${node_uuid}&engine=${engine}"
 
 upload_attachment "$artifact" "$mode" "$capture_mode" "${call_token}-${filename}" "$content_type" "false" "true" "$contains_payload"
 
+if [[ ! -s "$artifact" ]]; then
+  empty_artifact="$tmp_dir/empty-capture.json"
+  jq -n \
+    --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --arg requestedMode "$mode" \
+    --arg iface "$iface" \
+    --arg filter "$filter_expr" \
+    --arg duration "$duration" \
+    --arg callID "$call_id" \
+    --arg resourceUUID "$resource_uuid" \
+    '{generatedAt:$generatedAt,diagnostic:"empty_capture",requestedMode:$requestedMode,interface:$iface,filter:$filter,durationSeconds:($duration|tonumber),callID:$callID,resourceUUID:$resourceUUID,message:"Diagnostic capture was enabled, but no packets were captured during the capture window."}' \
+    >"$empty_artifact"
+  upload_attachment "$empty_artifact" "diagnostic_json" "empty_capture" "${call_token}-empty-capture.json" "application/json; charset=utf-8" "true" "false" "false"
+fi
+
 if [[ "$include_engine_logs" == "yes" ]]; then
   log_artifact="$tmp_dir/engine-log.txt"
   collect_engine_logs "$log_artifact"
