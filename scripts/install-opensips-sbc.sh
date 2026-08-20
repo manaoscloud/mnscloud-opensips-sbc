@@ -398,11 +398,13 @@ opensips_module_path() {
 }
 
 write_opensips_config() {
-  local cfg="/etc/opensips/opensips.cfg" module_path advertised_ip private_ip record_route_block sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply_body="" exec_modules="" capture_log_dir="/var/log/mnscloud/opensips"
+  local cfg="/etc/opensips/opensips.cfg" module_path advertised_ip private_ip socket_block record_route_block sip_i_modules="" uac_modules="" uac_params="" rtpengine_modules="" rtpengine_params="" rtpengine_bye="" rtpengine_offer="" rtpengine_reply_body="" exec_modules="" capture_log_dir="/var/log/mnscloud/opensips"
   module_path="$(opensips_module_path)"
   advertised_ip="$(opensips_advertised_ipv4)"
   private_ip="$(private_ipv4)"
   if [[ -n "${private_ip}" && -n "${advertised_ip}" && "${private_ip}" != "${advertised_ip}" ]]; then
+    socket_block="socket=udp:${private_ip}:5060 as ${advertised_ip}:5060
+socket=tcp:${private_ip}:5060 as ${advertised_ip}:5060"
     record_route_block="    if (\$si =~ \"^(10\\\\.|172\\\\.(1[6-9]|2[0-9]|3[0-1])\\\\.|192\\\\.168\\\\.)\") {
       record_route_preset(\"${advertised_ip}:5060\", \"${private_ip}:5060\");
     } else {
@@ -410,6 +412,8 @@ write_opensips_config() {
     }
     add_rr_param(\";r2=on\");"
   else
+    socket_block="socket=udp:0.0.0.0:5060 as ${advertised_ip}:5060
+socket=tcp:0.0.0.0:5060 as ${advertised_ip}:5060"
     record_route_block="    record_route();"
   fi
   if [[ -r "${module_path%/}/sip_i.so" ]]; then
@@ -475,8 +479,7 @@ xlog_level=3
 udp_workers=4
 server_header=\"Server: MNSCloud OpenSIPS SBC\"
 user_agent_header=\"User-Agent: MNSCloud OpenSIPS SBC\"
-socket=udp:0.0.0.0:5060 as ${advertised_ip}:5060
-socket=tcp:0.0.0.0:5060 as ${advertised_ip}:5060
+${socket_block}
 mpath=\"${module_path}\"
 
 loadmodule \"proto_udp.so\"
