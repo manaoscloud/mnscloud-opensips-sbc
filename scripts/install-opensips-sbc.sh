@@ -518,6 +518,31 @@ ${rtpengine_bye}
   }
 
   if (has_totag() && is_method(\"ACK|BYE\")) {
+    xlog(\"L_WARN\", \"mnscloud SBC in-dialog \$rm without usable Route for \$ci from \$si to \$ru route=\$hdr(Route); using dialog fallback\\n\");
+    if (is_method(\"BYE\")) {
+      \$var(dialog_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\"}\";
+      rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+      rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+      \$var(dialog_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/dialog?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(dialog_payload), \"application/json\", \$var(dialog_body), \$var(dialog_ct), \$var(dialog_http_code));
+      if (\$var(dialog_rc) >= 0 && \$var(dialog_http_code) == 200) {
+        \$json(dialog) := \$var(dialog_body);
+        if (\$json(dialog/allowed) == \"true\" && \$json(dialog/host) != NULL && \$json(dialog/port) != NULL) {
+          \$var(dst_transport) = \$json(dialog/transport);
+          if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
+          \$du = \"sip:\" + \$json(dialog/host) + \":\" + \$json(dialog/port) + \";transport=\" + \$var(dst_transport);
+          xlog(\"L_INFO\", \"mnscloud SBC in-dialog BYE dialog fallback routed call=\$ci dst=\$du source=\$si\\n\");
+          \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"bye\\\",\\\"direction\\\":\\\"inbound\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$json(dialog/pipeUUID) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$json(dialog/inputPeerUUID) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$json(dialog/host) + \"\\\",\\\"output_port\\\":\" + \$json(dialog/port) + \",\\\"output_transport\\\":\\\"\" + \$var(dst_transport) + \"\\\"}\";
+          rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+          rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+          \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
+          if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC dialog fallback BYE accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
+${rtpengine_bye}
+          if (!t_relay()) { sl_send_reply(500, \"Relay failed\"); }
+          exit;
+        }
+      }
+      xlog(\"L_WARN\", \"mnscloud SBC in-dialog BYE dialog fallback failed for \$ci rc=\$var(dialog_rc) http=\$var(dialog_http_code) body=\$var(dialog_body)\\n\");
+    }
     xlog(\"L_WARN\", \"mnscloud SBC in-dialog \$rm without Route for \$ci from \$si to \$ru route=\$hdr(Route); using authorized pipe fallback\\n\");
     \$var(pipe_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"direction\\\":\\\"inbound\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"auth_username\\\":\\\"\" + \$au + \"\\\"}\";
     rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
