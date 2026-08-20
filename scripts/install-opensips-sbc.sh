@@ -504,7 +504,7 @@ route {
   if (!mf_process_maxfwd_header(10)) { sl_send_reply(483, \"Too Many Hops\"); exit; }
   if (is_method(\"OPTIONS\")) { sl_send_reply(200, \"OK\"); exit; }
 
-  if (has_totag() && is_method(\"ACK|BYE\")) {
+  if (has_totag() && is_method(\"BYE\")) {
     \$var(dialog_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\"}\";
     rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
     rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
@@ -519,20 +519,18 @@ route {
         }
         \$du = \"sip:\" + \$json(dialog/host) + \":\" + \$json(dialog/port) + \";transport=\" + \$var(dst_transport);
         remove_hf(\"Route\");
-        xlog(\"L_INFO\", \"mnscloud SBC in-dialog \$rm dialog route call=\$ci ruri=\$ru dst=\$du source=\$si route=\$hdr(Route)\\n\");
-        if (is_method(\"BYE\")) {
-          \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"bye\\\",\\\"direction\\\":\\\"inbound\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$json(dialog/pipeUUID) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$json(dialog/inputPeerUUID) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$json(dialog/host) + \"\\\",\\\"output_port\\\":\" + \$json(dialog/port) + \",\\\"output_transport\\\":\\\"\" + \$var(dst_transport) + \"\\\"}\";
-          rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
-          rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
-          \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
-          if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC BYE dialog route accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
-        }
+        xlog(\"L_INFO\", \"mnscloud SBC in-dialog BYE dialog route call=\$ci ruri=\$ru dst=\$du source=\$si route=\$hdr(Route)\\n\");
+        \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"bye\\\",\\\"direction\\\":\\\"inbound\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$json(dialog/pipeUUID) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$json(dialog/inputPeerUUID) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$json(dialog/host) + \"\\\",\\\"output_port\\\":\" + \$json(dialog/port) + \",\\\"output_transport\\\":\\\"\" + \$var(dst_transport) + \"\\\"}\";
+        rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+        rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+        \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
+        if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC BYE dialog route accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
 ${rtpengine_bye}
         if (!t_relay()) { sl_send_reply(500, \"Relay failed\"); }
         exit;
       }
     }
-    xlog(\"L_WARN\", \"mnscloud SBC in-dialog \$rm dialog route unavailable for \$ci rc=\$var(dialog_rc) http=\$var(dialog_http_code) body=\$var(dialog_body); falling back to loose_route\\n\");
+    xlog(\"L_WARN\", \"mnscloud SBC in-dialog BYE dialog route unavailable for \$ci rc=\$var(dialog_rc) http=\$var(dialog_http_code) body=\$var(dialog_body); falling back to loose_route\\n\");
   }
 
   if (has_totag() && loose_route()) {
@@ -550,6 +548,11 @@ ${rtpengine_bye}
 
   if (has_totag() && is_method(\"ACK|BYE\")) {
     xlog(\"L_WARN\", \"mnscloud SBC in-dialog \$rm without usable Route for \$ci from \$si to \$ru route=\$hdr(Route); using dialog fallback\\n\");
+    if (is_method(\"ACK\")) {
+      xlog(\"L_WARN\", \"mnscloud SBC relaying in-dialog ACK without usable Route for \$ci from \$si to \$ru\\n\");
+      if (!t_relay()) { xlog(\"L_ERR\", \"mnscloud SBC failed to relay in-dialog ACK without usable Route for \$ci from \$si to \$ru\\n\"); }
+      exit;
+    }
     if (is_method(\"BYE\")) {
       \$var(dialog_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\"}\";
       rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
@@ -578,34 +581,8 @@ ${rtpengine_bye}
       }
       xlog(\"L_WARN\", \"mnscloud SBC in-dialog BYE dialog fallback failed for \$ci rc=\$var(dialog_rc) http=\$var(dialog_http_code) body=\$var(dialog_body)\\n\");
     }
-    xlog(\"L_WARN\", \"mnscloud SBC in-dialog \$rm without Route for \$ci from \$si to \$ru route=\$hdr(Route); using authorized pipe fallback\\n\");
-    \$var(pipe_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"direction\\\":\\\"inbound\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"auth_username\\\":\\\"\" + \$au + \"\\\"}\";
-    rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
-    rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
-    \$var(rest_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/pipe?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(pipe_payload), \"application/json\", \$var(body), \$var(ct), \$var(http_code));
-    if (\$var(rest_rc) < 0 || \$var(http_code) != 200) {
-      xlog(\"L_WARN\", \"mnscloud SBC in-dialog fallback pipe lookup failed for \$ci method=\$rm rc=\$var(rest_rc) http=\$var(http_code)\\n\");
-      if (is_method(\"ACK\") && t_check_trans()) { t_relay(); }
-      exit;
-    }
-    \$json(pipe) := \$var(body);
-    if (\$json(pipe/allowed) != \"true\" || \$json(pipe/host) == NULL || \$json(pipe/port) == NULL) {
-      xlog(\"L_WARN\", \"mnscloud SBC in-dialog fallback denied for \$ci method=\$rm body=\$var(body)\\n\");
-      if (is_method(\"ACK\") && t_check_trans()) { t_relay(); }
-      exit;
-    }
-    \$var(dst_transport) = \$json(pipe/transport);
-    if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
-    \$du = \"sip:\" + \$json(pipe/host) + \":\" + \$json(pipe/port) + \";transport=\" + \$var(dst_transport);
-    if (is_method(\"BYE\")) {
-      \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"bye\\\",\\\"direction\\\":\\\"\" + \$json(pipe/direction) + \"\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$json(pipe/pipeUUID) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$json(pipe/inputPeerUUID) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$json(pipe/host) + \"\\\",\\\"output_port\\\":\" + \$json(pipe/port) + \",\\\"output_transport\\\":\\\"\" + \$var(dst_transport) + \"\\\"}\";
-      rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
-      rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
-      \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
-      if (\$var(cdr_rc) < 0 || \$var(cdr_http_code) != 200) { xlog(\"L_WARN\", \"mnscloud SBC fallback BYE accounting failed for \$ci rc=\$var(cdr_rc) http=\$var(cdr_http_code) body=\$var(cdr_body)\\n\"); }
-${rtpengine_bye}
-    }
-    if (!t_relay()) { if (!is_method(\"ACK\")) { sl_send_reply(500, \"Relay failed\"); } }
+    xlog(\"L_WARN\", \"mnscloud SBC in-dialog \$rm dialog fallback unavailable for \$ci; not recalculating runtime pipe for an established dialog\\n\");
+    if (!is_method(\"ACK\")) { sl_send_reply(481, \"Dialog route unavailable\"); }
     exit;
   }
 

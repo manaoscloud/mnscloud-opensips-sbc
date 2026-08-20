@@ -121,10 +121,11 @@ back to the first private IPv4 when public detection is unavailable. Initial INV
 Record-Routed so ACK/BYE/re-INVITE requests stay on the SBC path. When public and private host
 addresses differ, the generated configuration uses double Record-Route with `r2=on`, preserving the
 correct dialog route across public and private sides. ACK requests without route headers are not
-sent back to the runtime pipe decision engine and are not blindly relayed to the ACK R-URI, since a
-local R-URI can create a self-loop; they are logged as route-set failures. When a media relay is
-configured, `rtpengine_offer()` failures reject the INVITE with `500 Media relay failed`, while
-`rtpengine_answer()` failures are logged for one-way-audio diagnosis.
+sent back to the runtime pipe decision engine; after the route-set path fails, the connector
+attempts to relay the ACK through the current dialog R-URI/Contact and logs relay failures so 200 OK
+dialogs are not dropped silently. When a media relay is configured, `rtpengine_offer()` failures
+reject the INVITE with `500 Media relay failed`, while `rtpengine_answer()` failures are logged for
+one-way-audio diagnosis.
 
 ## Validate
 
