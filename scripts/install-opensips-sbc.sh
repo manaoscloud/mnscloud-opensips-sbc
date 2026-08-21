@@ -503,6 +503,26 @@ route {
   if (!mf_process_maxfwd_header(10)) { sl_send_reply(483, \"Too Many Hops\"); exit; }
   if (is_method(\"OPTIONS\")) { sl_send_reply(200, \"OK\"); exit; }
 
+  if (has_totag() && is_method(\"ACK\")) {
+    \$var(dialog_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\"}\";
+    rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+    rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+    \$var(dialog_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/dialog?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(dialog_payload), \"application/json\", \$var(dialog_body), \$var(dialog_ct), \$var(dialog_http_code));
+    if (\$var(dialog_rc) >= 0 && \$var(dialog_http_code) == 200) {
+      \$json(dialog) := \$var(dialog_body);
+      if ((\$json(dialog/allowed) == \"true\" || \$json(dialog/allowed) == 1 || \$json(dialog/allowed) == \"1\") && \$json(dialog/host) != NULL && \$json(dialog/port) != NULL) {
+        \$var(dst_transport) = \$json(dialog/transport);
+        if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
+        \$du = \"sip:\" + \$json(dialog/host) + \":\" + \$json(dialog/port) + \";transport=\" + \$var(dst_transport);
+        remove_hf(\"Route\");
+        xlog(\"L_INFO\", \"mnscloud SBC in-dialog ACK dialog fallback routed call=\$ci ruri=\$ru dst=\$du source=\$si\\n\");
+        if (!t_relay()) { xlog(\"L_ERR\", \"mnscloud SBC failed to relay in-dialog ACK dialog fallback call=\$ci ruri=\$ru dst=\$du source=\$si\\n\"); }
+        exit;
+      }
+    }
+    xlog(\"L_WARN\", \"mnscloud SBC in-dialog ACK dialog fallback unavailable call=\$ci rc=\$var(dialog_rc) http=\$var(dialog_http_code) body=\$var(dialog_body); trying loose_route\\n\");
+  }
+
   if (has_totag() && loose_route()) {
     if (is_method(\"BYE\")) {
       \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"bye\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\"}\";
@@ -655,7 +675,7 @@ ${rtpengine_offer}
 onreply_route[MNSCLOUD_REPLY] {
 ${rtpengine_reply_body}
   if (\$avp(mns_enable_cdr) == 1 && \$rs >= 200) {
-    \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"reply\\\",\\\"direction\\\":\\\"\" + \$avp(mns_direction) + \"\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$avp(mns_pipe_uuid) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$avp(mns_input_peer_uuid) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"output_contact_uri\\\":\\\"\" + \$(ct{nameaddr.uri}) + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$avp(mns_output_host) + \"\\\",\\\"output_port\\\":\" + \$avp(mns_output_port) + \",\\\"output_transport\\\":\\\"\" + \$avp(mns_output_transport) + \"\\\",\\\"sip_code\\\":\" + \$rs + \",\\\"sip_reason\\\":\\\"\" + \$rr + \"\\\"}\";
+    \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"reply\\\",\\\"direction\\\":\\\"\" + \$avp(mns_direction) + \"\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"pipe_uuid\\\":\\\"\" + \$avp(mns_pipe_uuid) + \"\\\",\\\"input_peer_uuid\\\":\\\"\" + \$avp(mns_input_peer_uuid) + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"output_contact_uri\\\":\\\"\" + \$(hdr(Contact){nameaddr.uri}) + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\",\\\"output_host\\\":\\\"\" + \$avp(mns_output_host) + \"\\\",\\\"output_port\\\":\" + \$avp(mns_output_port) + \",\\\"output_transport\\\":\\\"\" + \$avp(mns_output_transport) + \"\\\",\\\"sip_code\\\":\" + \$rs + \",\\\"sip_reason\\\":\\\"\" + \$rr + \"\\\"}\";
     rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
     rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
     \$var(cdr_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/accounting?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(cdr_payload), \"application/json\", \$var(cdr_body), \$var(cdr_ct), \$var(cdr_http_code));
