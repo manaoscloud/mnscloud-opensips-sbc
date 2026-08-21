@@ -119,8 +119,10 @@ The generated OpenSIPS configuration sets both SIP `Server` and `User-Agent` hea
 Generated SIP sockets listen on all interfaces and advertise the detected public IPv4, falling
 back to the first private IPv4 when public detection is unavailable. Initial INVITEs are
 Record-Routed so ACK/BYE/re-INVITE requests stay on the SBC path. When public and private host
-addresses differ, the generated configuration uses double Record-Route with `r2=on`, preserving the
-correct dialog route across public and private sides. ACK requests without route headers are not
+addresses differ, the generated SBC configuration keeps a single public Record-Route for the SBC
+leg; chained engines such as the Softswitch own any double Record-Route pairs required for their
+private/public edge. This avoids one proxy consuming another proxy's `r2=on` pair during ACK/BYE
+loose routing. ACK requests without route headers are not
 sent back to the runtime pipe decision engine; after the route-set path fails, the connector
 attempts to relay the ACK through the current dialog R-URI/Contact and logs relay failures so 200 OK
 dialogs are not dropped silently. When a media relay is configured, `rtpengine_offer()` failures

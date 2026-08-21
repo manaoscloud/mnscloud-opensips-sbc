@@ -98,9 +98,11 @@ O instalador:
 - grava `/etc/mnscloud/sbc/media.socket` quando a API retorna `rtpengineSocket`;
 - habilita `rtpengine.so` e `rtpengine_offer/answer/delete` apenas quando existe media relay associado;
 - anuncia o socket SIP com o IPv4 público detectado, ou o primeiro IPv4 privado como fallback;
-- aplica `record_route()` em chamadas encaminhadas para manter ACK/BYE/re-INVITE no caminho do SBC;
-- quando o servidor tem IP público e privado diferentes, usa double Record-Route com `r2=on` para
-  preservar o caminho correto entre lado público e lado privado do diálogo;
+- aplica Record-Route em chamadas encaminhadas para manter ACK/BYE/re-INVITE no caminho do SBC;
+- quando o servidor tem IP público e privado diferentes, o SBC insere apenas o Record-Route público
+  dele. Em fluxos encadeados com Softswitch/PABX, cada engine downstream é responsável pelo próprio
+  double Record-Route quando cruza uma borda privada/pública; o SBC não marca seu Route com `r2=on`
+  para não consumir o par de outra engine durante `loose_route()`;
 - quando recebe ACK in-dialog sem `Route` útil depois da tentativa de `loose_route()`, não recalcula
   Pipe nem chama a API; tenta relatar o ACK pelo R-URI/Contact do diálogo e registra erro se o relay
   falhar, evitando tanto loop de decisão quanto queda por ACK descartado;

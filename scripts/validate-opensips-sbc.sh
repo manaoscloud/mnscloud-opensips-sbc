@@ -19,10 +19,14 @@ grep -Fq 'socket=udp:${private_ip}:5060 as ${advertised_ip}:5060' "$installer" |
   echo "[validate-opensips-sbc] installer must bind the private socket when advertising a public address" >&2
   exit 1
 }
-grep -Fq 'record_route_preset(\"${advertised_ip}:5060\", \"${private_ip}:5060\")' "$installer" || {
-  echo "[validate-opensips-sbc] installer must keep dual Record-Route for private/public paths" >&2
+grep -Fq 'record_route_preset(\"${advertised_ip}:5060\")' "$installer" || {
+  echo "[validate-opensips-sbc] installer must keep a single public Record-Route for SBC dialog paths" >&2
   exit 1
 }
+if grep -Fq 'add_rr_param(\";r2=on\")' "$installer"; then
+  echo "[validate-opensips-sbc] SBC must not mark its own Record-Route as double-RR; chained engines own their own route pairs" >&2
+  exit 1
+fi
 grep -Fq 'mnscloud SBC relaying in-dialog ACK without usable Route' "$installer" || {
   echo "[validate-opensips-sbc] installer must relay in-dialog ACK fallback without runtime pipe lookup" >&2
   exit 1
