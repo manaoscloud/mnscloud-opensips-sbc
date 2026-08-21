@@ -35,6 +35,10 @@ if grep -Fq 'add_rr_param(\";r2=on\")' "$installer"; then
   echo "[validate-opensips-sbc] SBC must not mark its own Record-Route as double-RR; chained engines own their own route pairs" >&2
   exit 1
 fi
+if grep -Fq 'consuming stacked local Route' "$installer"; then
+  echo "[validate-opensips-sbc] in-dialog requests must call loose_route() once; stacked local Route consumption can skip the next engine hop" >&2
+  exit 1
+fi
 grep -Fq 'mnscloud SBC relaying in-dialog ACK without usable Route' "$installer" || {
   echo "[validate-opensips-sbc] installer must relay in-dialog ACK fallback without runtime pipe lookup" >&2
   exit 1
