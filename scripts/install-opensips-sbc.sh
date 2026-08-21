@@ -405,12 +405,7 @@ write_opensips_config() {
   if [[ -n "${private_ip}" && -n "${advertised_ip}" && "${private_ip}" != "${advertised_ip}" ]]; then
     socket_block="socket=udp:${private_ip}:5060 as ${advertised_ip}:5060
 socket=tcp:${private_ip}:5060 as ${advertised_ip}:5060"
-    record_route_block="    if (\$si =~ \"^(10\\\\.|172\\\\.(1[6-9]|2[0-9]|3[0-1])\\\\.|192\\\\.168\\\\.)\") {
-      record_route_preset(\"${advertised_ip}:5060\", \"${private_ip}:5060\");
-    } else {
-      record_route_preset(\"${private_ip}:5060\", \"${advertised_ip}:5060\");
-    }
-    add_rr_param(\";r2=on\");"
+    record_route_block="    record_route_preset(\"${advertised_ip}:5060\");"
   else
     socket_block="socket=udp:0.0.0.0:5060 as ${advertised_ip}:5060
 socket=tcp:0.0.0.0:5060 as ${advertised_ip}:5060"
