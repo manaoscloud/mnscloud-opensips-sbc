@@ -504,12 +504,6 @@ route {
   if (is_method(\"OPTIONS\")) { sl_send_reply(200, \"OK\"); exit; }
 
   if (has_totag() && loose_route()) {
-    if (\$rd == \"${private_ip}\" || \$rd == \"${advertised_ip}\") {
-      xlog(\"L_INFO\", \"mnscloud SBC consuming stacked local Route engine=${SBC_ENGINE} method=\$rm call=\$ci ruri=\$ru route=\$hdr(Route) source=\$si\\n\");
-      if (!loose_route()) {
-        xlog(\"L_WARN\", \"mnscloud SBC failed to consume stacked local Route engine=${SBC_ENGINE} method=\$rm call=\$ci ruri=\$ru route=\$hdr(Route) source=\$si\\n\");
-      }
-    }
     if (is_method(\"BYE\")) {
       \$var(cdr_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"event\\\":\\\"bye\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"destination\\\":\\\"\" + \$rU + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"local_ip\\\":\\\"\" + \$socket_in(ip) + \"\\\",\\\"local_port\\\":\" + \$socket_in(port) + \",\\\"from_user\\\":\\\"\" + \$fU + \"\\\",\\\"from_domain\\\":\\\"\" + \$fd + \"\\\",\\\"to_user\\\":\\\"\" + \$tU + \"\\\",\\\"to_domain\\\":\\\"\" + \$td + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\"}\";
       rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
