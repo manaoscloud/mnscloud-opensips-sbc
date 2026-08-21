@@ -39,12 +39,12 @@ if grep -Fq 'consuming stacked local Route' "$installer"; then
   echo "[validate-opensips-sbc] in-dialog requests must call loose_route() once; stacked local Route consumption can skip the next engine hop" >&2
   exit 1
 fi
-grep -Fq 'mnscloud SBC in-dialog ACK dialog fallback routed' "$installer" || {
-  echo "[validate-opensips-sbc] installer must route in-dialog ACK through the existing dialog fallback before loose_route()" >&2
+! grep -Fq 'mnscloud SBC in-dialog ACK dialog fallback routed' "$installer" || {
+  echo "[validate-opensips-sbc] in-dialog ACK must not bypass loose_route() with dialog fallback before trying the established route-set" >&2
   exit 1
 }
-grep -Fq '\$ru = \"sip:\" + \$rU + \"@\" + \$json(dialog/host)' "$installer" || {
-  echo "[validate-opensips-sbc] ACK dialog fallback must rebuild the Request-URI for the resolved next hop" >&2
+grep -Fq 'if (has_totag() && loose_route())' "$installer" || {
+  echo "[validate-opensips-sbc] in-dialog requests must use loose_route() before any fallback" >&2
   exit 1
 }
 grep -Fq '$(hdr(Contact){nameaddr.uri})' "$installer" || {
