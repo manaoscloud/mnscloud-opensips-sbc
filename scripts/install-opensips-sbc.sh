@@ -405,13 +405,13 @@ write_opensips_config() {
   if [[ -n "${private_ip}" && -n "${advertised_ip}" && "${private_ip}" != "${advertised_ip}" ]]; then
     socket_block="socket=udp:${private_ip}:5060 as ${advertised_ip}:5060
 socket=tcp:${private_ip}:5060 as ${advertised_ip}:5060"
-    alias_block="alias=${private_ip}:5060
-alias=${advertised_ip}:5060"
+    alias_block="alias=\"${private_ip}:5060\"
+alias=\"${advertised_ip}:5060\""
     record_route_block="    record_route_preset(\"${advertised_ip}:5060\");"
   else
     socket_block="socket=udp:0.0.0.0:5060 as ${advertised_ip}:5060
 socket=tcp:0.0.0.0:5060 as ${advertised_ip}:5060"
-    alias_block="alias=${advertised_ip}:5060"
+    alias_block="alias=\"${advertised_ip}:5060\""
     record_route_block="    record_route();"
   fi
   if [[ -r "${module_path%/}/sip_i.so" ]]; then
