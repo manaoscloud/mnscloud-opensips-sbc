@@ -98,6 +98,9 @@ O instalador:
 - grava `/etc/mnscloud/sbc/media.socket` quando a API retorna `rtpengineSocket`;
 - habilita `rtpengine.so` e `rtpengine_offer/answer/delete` apenas quando existe media relay associado;
 - anuncia o socket SIP com o IPv4 público detectado, ou o primeiro IPv4 privado como fallback;
+- registra o IPv4 privado e o IPv4 público anunciado como `alias` locais com porta `5060`, para que
+  o `loose_route()` reconheça o próprio Record-Route em ACK/BYE/re-INVITE mesmo quando o servidor
+  roda atrás de NAT/container;
 - aplica Record-Route em chamadas encaminhadas para manter ACK/BYE/re-INVITE no caminho do SBC;
 - quando o servidor tem IP público e privado diferentes, o SBC insere apenas o Record-Route público
   dele. Em fluxos encadeados com Softswitch/PABX, cada engine downstream é responsável pelo próprio
@@ -154,6 +157,9 @@ resultado consolidado em `VoipSbcPeer`.
 - O roteamento de diálogo usa `Record-Route` e `loose_route`; ACK/BYE sequenciais devem retornar
   com cabeçalho `Route`. Quando um equipamento remove esse cabeçalho, o SBC registra `Route`,
   `Contact` e R-URI no log para diagnóstico e mantém comportamento fail-closed.
+- O endereço público anunciado e o endereço privado de escuta são declarados como aliases locais do
+  OpenSIPS. Isso evita que ACK/BYE com `Route` público sejam tratados como um próximo hop externo e
+  voltem para o próprio SBC em vez de avançar para o próximo elemento do diálogo.
 - Políticas de codec ficam no control plane do `VoipSbcPipe` e devem ser aplicadas conforme
   instruções retornadas pela API. O padrão operacional é codec pass-through; transcoding deve ser
   tratado como exceção explícita por capacidade do media relay e decisão do master.
