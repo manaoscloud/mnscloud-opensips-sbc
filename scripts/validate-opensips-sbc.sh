@@ -43,6 +43,10 @@ grep -Fq 'mnscloud SBC in-dialog ACK dialog fallback routed' "$installer" || {
   echo "[validate-opensips-sbc] installer must route in-dialog ACK through the existing dialog fallback before loose_route()" >&2
   exit 1
 }
+grep -Fq '\$ru = \"sip:\" + \$rU + \"@\" + \$json(dialog/host)' "$installer" || {
+  echo "[validate-opensips-sbc] ACK dialog fallback must rebuild the Request-URI for the resolved next hop" >&2
+  exit 1
+}
 grep -Fq '$(hdr(Contact){nameaddr.uri})' "$installer" || {
   echo "[validate-opensips-sbc] reply accounting must capture the reply Contact header for dialog diagnostics" >&2
   exit 1

@@ -513,6 +513,7 @@ route {
       if ((\$json(dialog/allowed) == \"true\" || \$json(dialog/allowed) == 1 || \$json(dialog/allowed) == \"1\") && \$json(dialog/host) != NULL && \$json(dialog/port) != NULL) {
         \$var(dst_transport) = \$json(dialog/transport);
         if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
+        \$ru = \"sip:\" + \$rU + \"@\" + \$json(dialog/host) + \":\" + \$json(dialog/port) + \";transport=\" + \$var(dst_transport);
         \$du = \"sip:\" + \$json(dialog/host) + \":\" + \$json(dialog/port) + \";transport=\" + \$var(dst_transport);
         remove_hf(\"Route\");
         xlog(\"L_INFO\", \"mnscloud SBC in-dialog ACK dialog fallback routed call=\$ci ruri=\$ru dst=\$du source=\$si\\n\");
