@@ -23,11 +23,11 @@ grep -Fq 'record_route_preset(\"${advertised_ip}:5060\")' "$installer" || {
   echo "[validate-opensips-sbc] installer must keep a single public Record-Route for SBC dialog paths" >&2
   exit 1
 }
-grep -Fq 'alias=${advertised_ip}:5060' "$installer" || {
+grep -Fq 'alias=\"${advertised_ip}:5060\"' "$installer" || {
   echo "[validate-opensips-sbc] installer must declare the advertised public SIP identity as a local alias for loose_route()" >&2
   exit 1
 }
-grep -Fq 'alias=${private_ip}:5060' "$installer" || {
+grep -Fq 'alias=\"${private_ip}:5060\"' "$installer" || {
   echo "[validate-opensips-sbc] installer must declare the private SIP listener as a local alias for loose_route()" >&2
   exit 1
 }
