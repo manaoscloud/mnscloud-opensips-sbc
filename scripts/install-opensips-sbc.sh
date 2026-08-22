@@ -519,8 +519,26 @@ ${rtpengine_bye}
   if (has_totag() && is_method(\"ACK|BYE\")) {
     xlog(\"L_WARN\", \"mnscloud SBC in-dialog \$rm without usable Route for \$ci from \$si to \$ru route=\$hdr(Route); using dialog fallback\\n\");
     if (is_method(\"ACK\")) {
-      xlog(\"L_WARN\", \"mnscloud SBC relaying in-dialog ACK without usable Route for \$ci from \$si to \$ru\\n\");
-      if (!t_relay()) { xlog(\"L_ERR\", \"mnscloud SBC failed to relay in-dialog ACK without usable Route for \$ci from \$si to \$ru\\n\"); }
+      \$var(dialog_payload) = \"{\\\"engine\\\":\\\"${SBC_ENGINE}\\\",\\\"call_id\\\":\\\"\" + \$ci + \"\\\",\\\"source_ip\\\":\\\"\" + \$si + \"\\\",\\\"source_port\\\":\" + \$sp + \",\\\"source_transport\\\":\\\"\" + \$socket_in(proto) + \"\\\",\\\"ruri_user\\\":\\\"\" + \$rU + \"\\\",\\\"ruri_domain\\\":\\\"\" + \$rd + \"\\\"}\";
+      rest_append_hf(\"Authorization: Bearer ${API_TOKEN}\");
+      rest_append_hf(\"X-SBC-Engine: ${SBC_ENGINE}\");
+      \$var(dialog_rc) = rest_post(\"${API_BASE}/api/v1/sbc/runtime/dialog?node_uuid=${NODE_UUID}&engine=${SBC_ENGINE}\", \$var(dialog_payload), \"application/json\", \$var(dialog_body), \$var(dialog_ct), \$var(dialog_http_code));
+      if (\$var(dialog_rc) >= 0 && \$var(dialog_http_code) == 200) {
+        \$json(dialog) := \$var(dialog_body);
+        if ((\$json(dialog/allowed) == \"true\" || \$json(dialog/allowed) == 1 || \$json(dialog/allowed) == \"1\") && \$json(dialog/host) != NULL && \$json(dialog/port) != NULL) {
+          \$var(dst_transport) = \$json(dialog/transport);
+          if (\$var(dst_transport) == NULL) { \$var(dst_transport) = \"udp\"; }
+          if (\$json(dialog/requestURI) != NULL && \$json(dialog/requestURI) != \"\") {
+            \$ru = \$json(dialog/requestURI);
+          }
+          \$du = \"sip:\" + \$json(dialog/host) + \":\" + \$json(dialog/port) + \";transport=\" + \$var(dst_transport);
+          remove_hf(\"Route\");
+          xlog(\"L_INFO\", \"mnscloud SBC in-dialog ACK dialog fallback routed call=\$ci ruri=\$ru dst=\$du source=\$si\\n\");
+          if (!t_relay()) { xlog(\"L_ERR\", \"mnscloud SBC failed to relay in-dialog ACK dialog fallback for \$ci ruri=\$ru dst=\$du source=\$si\\n\"); }
+          exit;
+        }
+      }
+      xlog(\"L_ERR\", \"mnscloud SBC in-dialog ACK dialog fallback failed for \$ci rc=\$var(dialog_rc) http=\$var(dialog_http_code) body=\$var(dialog_body); ACK must follow Record-Route or stored dialog next-hop\\n\");
       exit;
     }
     if (is_method(\"BYE\")) {

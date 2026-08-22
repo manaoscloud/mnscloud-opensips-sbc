@@ -122,10 +122,11 @@ Record-Routed so ACK/BYE/re-INVITE requests stay on the SBC path. When public an
 addresses differ, the generated SBC configuration keeps a single public Record-Route for the SBC
 leg; chained engines such as the Softswitch own any double Record-Route pairs required for their
 private/public edge. This avoids one proxy consuming another proxy's `r2=on` pair during ACK/BYE
-loose routing. ACK requests without route headers are not
-sent back to the runtime pipe decision engine; after the route-set path fails, the connector
-attempts to relay the ACK through the current dialog R-URI/Contact and logs relay failures so 200 OK
-dialogs are not dropped silently. When a media relay is configured, `rtpengine_offer()` failures
+loose routing. ACK requests without route headers are not sent back to the runtime pipe decision
+engine and are not relayed through the dialog R-URI/Contact. Confirmed ACK should follow the
+established Record-Route route-set; when an upstream removes that route-set, the SBC uses only the
+stored runtime dialog next-hop to forward the ACK toward the Softswitch and fails closed if the
+dialog cannot be resolved. When a media relay is configured, `rtpengine_offer()` failures
 reject the INVITE with `500 Media relay failed`, while `rtpengine_answer()` failures are logged for
 one-way-audio diagnosis.
 

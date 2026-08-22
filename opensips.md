@@ -107,8 +107,10 @@ O instalador:
   double Record-Route quando cruza uma borda privada/pública; o SBC não marca seu Route com `r2=on`
   para não consumir o par de outra engine durante `loose_route()`;
 - quando recebe ACK in-dialog sem `Route` útil depois da tentativa de `loose_route()`, não recalcula
-  Pipe nem chama a API; tenta relatar o ACK pelo R-URI/Contact do diálogo e registra erro se o relay
-  falhar, evitando tanto loop de decisão quanto queda por ACK descartado;
+  Pipe e não tenta relatar pelo R-URI/Contact do diálogo; ACK confirmado deve seguir o route-set
+  criado por `Record-Route`, e quando algum upstream remove esse route-set o SBC usa apenas o
+  próximo hop armazenado no diálogo runtime para entregar o ACK ao Softswitch, falhando fechado se o
+  diálogo não existir;
 - falha explicitamente o INVITE quando `rtpengine_offer()` não consegue ancorar a mídia e registra
   erro em `rtpengine_answer()` para facilitar diagnóstico de áudio unilateral;
 - define os cabeçalhos SIP gerados `Server` e `User-Agent` como `MNSCloud OpenSIPS SBC`;

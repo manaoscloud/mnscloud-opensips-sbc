@@ -39,8 +39,16 @@ if grep -Fq 'consuming stacked local Route' "$installer"; then
   echo "[validate-opensips-sbc] in-dialog requests must call loose_route() once; stacked local Route consumption can skip the next engine hop" >&2
   exit 1
 fi
-! grep -Fq 'mnscloud SBC in-dialog ACK dialog fallback routed' "$installer" || {
-  echo "[validate-opensips-sbc] in-dialog ACK must not bypass loose_route() with dialog fallback before trying the established route-set" >&2
+grep -Fq 'mnscloud SBC in-dialog ACK dialog fallback routed' "$installer" || {
+  echo "[validate-opensips-sbc] in-dialog ACK without Route must use the stored dialog next-hop fallback after loose_route() fails" >&2
+  exit 1
+}
+! grep -Fq 'relaying in-dialog ACK without usable Route' "$installer" || {
+  echo "[validate-opensips-sbc] in-dialog ACK without a usable Route must not be relayed to the dialog Contact/R-URI; it must follow Record-Route" >&2
+  exit 1
+}
+grep -Fq 'stored dialog next-hop' "$installer" || {
+  echo "[validate-opensips-sbc] in-dialog ACK fallback must explicitly use the stored dialog next-hop and fail closed if unavailable" >&2
   exit 1
 }
 grep -Fq 'if (has_totag() && loose_route())' "$installer" || {
