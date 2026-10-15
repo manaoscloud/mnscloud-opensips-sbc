@@ -16,3 +16,5 @@ jobs:
         run: |
           bash -n scripts/*.sh scripts/lib/*.sh
           bash scripts/validate-opensips-sbc.sh
+      - name: Engine log settings contract
+        run: python3 tests/engine-logs.py && python3 tests/opensips-sbc-logs.py
