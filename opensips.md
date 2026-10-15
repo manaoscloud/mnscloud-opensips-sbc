@@ -208,3 +208,22 @@ curl -sS -X POST "${API_BASE}/api/v1/sbc/runtime/heartbeat?node_uuid=${NODE_UUID
   -H "X-SBC-Engine: opensips" \
   --data '{"engine":"opensips","hostname":"sbc-dev1"}'
 ```
+
+## Engine log settings (server Logs tab)
+
+The SBC server **Logs** tab (enable, level `error|warning|notice|info|debug`, retention 1-90 days)
+is applied by `mnscloud-opensips-sbc-logs.timer`, installed by the installer and run every minute as
+root from `/usr/local/lib/mnscloud/engine-logs/opensips-sbc-logs.py` (shared core:
+`scripts/mnscloud_engine_logs.py`, identical in every engine repository).
+
+- Source: authenticated `POST /api/v1/sbc/runtime/log-config` with the node identity; HTTPS only, no
+  redirects. When the API is unreachable the last applied settings stay in force.
+- Disabled log = level `error` (errors and security events are always kept). Debug is a 4 hour
+  window decided by the API; it falls back to `notice`. Below 15% free disk debug/info are capped at
+  `notice`.
+- Live apply: MI `log_level` over `/run/opensips/mnscloud_sbc_fifo` (no restart). Re-applied after an engine restart.
+- Retention: OpenSIPS logs to journald: the retention becomes `MaxRetentionSec` in `/etc/systemd/journald.conf.d/60-mnscloud-engine-logs.conf`. The CDR capture log is rotated and purged. The shared installer log `/var/log/mnscloud-install.log` follows the same
+  retention.
+- Status: `journalctl -u mnscloud-opensips-sbc-logs` (one JSON line per run, never tokens).
+- Tests: `python3 tests/engine-logs.py && python3 tests/opensips-sbc-logs.py`.
+

@@ -4,6 +4,8 @@ set -euo pipefail
 LOG_PREFIX="[install-opensips-sbc]"
 # shellcheck disable=SC1091
 source "$(dirname "$0")/lib/install-base.sh" "$@"
+# shellcheck disable=SC1091
+source "$(dirname "$0")/lib/engine-logs.sh"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 NODE_UUID_FILE="/etc/mnscloud/sbc/node.uuid"
@@ -735,6 +737,7 @@ main() {
   write_opensips_config
   enable_service
   remove_runtime_sync_units
+  install_engine_logs_timer opensips-sbc "${SCRIPT_DIR}"
   refresh_agent_capabilities
   ok "OpenSIPS SBC installed. Node UUID: ${NODE_UUID}"
 }
