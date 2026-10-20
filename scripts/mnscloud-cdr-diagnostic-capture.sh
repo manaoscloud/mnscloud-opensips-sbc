@@ -193,7 +193,7 @@ upload_attachment() {
   local contains_sdp="$7"
   local contains_payload="$8"
   [[ -s "$artifact" ]] || { echo "Skipping empty diagnostic artifact ${diagnostic_type}." >&2; return 0; }
-  local size_bytes checksum prepare_payload prepare_response upload_url storage_key storage_account_uuid register_payload
+  local size_bytes checksum prepare_payload prepare_response upload_url storage_key storage_bucket_uuid register_payload
   size_bytes="$(stat -c '%s' "$artifact")"
   checksum="$(sha256sum "$artifact" | awk '{print $1}')"
   prepare_payload="$(jq -n \
@@ -204,16 +204,16 @@ upload_attachment() {
     -H "Authorization: Bearer $api_token" -H "Content-Type: application/json" -H "X-MNSCloud-Node-UUID: $node_uuid" --data "$prepare_payload")"
   upload_url="$(jq -r '.data.uploadUrl // empty' <<<"$prepare_response")"
   storage_key="$(jq -r '.data.key // empty' <<<"$prepare_response")"
-  storage_account_uuid="$(jq -r '.data.storageAccountUUID // empty' <<<"$prepare_response")"
+  storage_bucket_uuid="$(jq -r '.data.storageBucketUUID // empty' <<<"$prepare_response")"
   [[ -n "$upload_url" && -n "$storage_key" ]] || { echo "API did not return upload URL for ${diagnostic_type}." >&2; return 0; }
   curl -fsS -X PUT "$upload_url" -H "Content-Type: $content_type" --data-binary "@$artifact" >/dev/null
   register_payload="$(jq -n \
     --arg diagnosticModule "$module" --arg engine "$engine" --arg resourceType "$resource_type" \
-    --arg resourceUUID "$resource_uuid" --arg callID "$call_id" --arg storageAccountUUID "$storage_account_uuid" \
+    --arg resourceUUID "$resource_uuid" --arg callID "$call_id" --arg storageBucketUUID "$storage_bucket_uuid" \
     --arg storageObjectKey "$storage_key" --arg checksumSha256 "$checksum" --arg diagnosticType "$diagnostic_type" \
     --arg captureMode "$capture_mode" --arg originalFilename "$filename" --arg contentType "$content_type" \
     --argjson sizeBytes "$size_bytes" --argjson sanitized "$sanitized" --argjson containsSdp "$contains_sdp" --argjson containsPayload "$contains_payload" \
-    '{module:$diagnosticModule,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,callID:$callID,diagnosticType:$diagnosticType,captureMode:$captureMode,storageMode:"storage",storageAccountUUID:$storageAccountUUID,storageObjectKey:$storageObjectKey,originalFilename:$originalFilename,contentType:$contentType,sizeBytes:$sizeBytes,checksumSha256:$checksumSha256,sanitized:$sanitized,containsSdp:$containsSdp,containsPayload:$containsPayload,status:"available"}')"
+    '{module:$diagnosticModule,engine:$engine,resourceType:$resourceType,resourceUUID:$resourceUUID,callID:$callID,diagnosticType:$diagnosticType,captureMode:$captureMode,storageMode:"storage",storageBucketUUID:$storageBucketUUID,storageObjectKey:$storageObjectKey,originalFilename:$originalFilename,contentType:$contentType,sizeBytes:$sizeBytes,checksumSha256:$checksumSha256,sanitized:$sanitized,containsSdp:$containsSdp,containsPayload:$containsPayload,status:"available"}')"
   curl -fsS -X POST "${api_base%/}/api/v1/voip/cdr-diagnostics/runtime?${runtime_query}" \
     -H "Authorization: Bearer $api_token" -H "Content-Type: application/json" -H "X-MNSCloud-Node-UUID: $node_uuid" --data "$register_payload" >/dev/null
 }
